@@ -26,6 +26,7 @@
 #include "stdio.h"
 #include "string.h"
 #include "usbd_cdc_if.h"
+#include "BMI088.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,7 +47,7 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-
+static const uint8_t ACC_ADDR = 0x18 << 1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -79,7 +80,11 @@ uint8_t *data = "TEST\n";
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  HAL_StatusTypeDef ret; // HAL Status Value
+  uint8_t buf[16];
+  uint8_t abuf[6];       // Accelerometer Buffer
+  uint8_t gbuf[6];       // Gyroscope Buffer
+  float   obuf[3];       // Output Buffer
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -114,11 +119,25 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
-	  HAL_Delay(250);
+	  HAL_Delay(500);
 	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
 
-	  printf("Hello from the SWD Port!\n");
-	  CDC_Transmit_FS(data, strlen((char*)data));
+	  // CDC_Transmit_FS(data, strlen((char*)data));
+
+	  buf[0] = 0x00;
+	  ret = HAL_I2C_Master_Transmit(&hi2c1, 0x18 << 1, buf, 1, HAL_MAX_DELAY);
+	  if (ret != HAL_OK){
+		  CDC_Transmit_FS("TX ERROR\n", 9);
+	  }
+	  ret = HAL_I2C_Master_Receive(&hi2c1, 0x18 << 1, buf, 1, HAL_MAX_DELAY);
+	  if (ret != HAL_OK){
+	      CDC_Transmit_FS("RX ERROR\n", 9);
+	  }
+
+	  //buf[0] = 0x1E;
+	  sprintf(abuf, "0x%02X\n", buf[0]);
+	  abuf[4] = '\n';
+	  CDC_Transmit_FS(abuf, 5);
   }
   /* USER CODE END 3 */
 }
