@@ -79,11 +79,11 @@ int _write(int file, char *ptr, int len)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  HAL_StatusTypeDef ret; // HAL Status Value
-  uint8_t buf[16];
+  //HAL_StatusTypeDef ret; // HAL Status Value
+  uint8_t buf[16];       // General Buffer
   uint8_t abuf[6];       // Accelerometer Buffer
-  //uint8_t gbuf[6];       // Gyroscope Buffer
-  //float   obuf[3];       // Output Buffer
+  uint8_t gbuf[6];       // Gyroscope Buffer
+  float   obuf[3];       // Output Buffer
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -123,11 +123,13 @@ int main(void)
 	  HAL_Delay(500);
 	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
 
+	  if ( BMI088_I2C_Read_Accel(&hi2c1, abuf) != HAL_OK ) { Error_Handler(); }
+	  if ( BMI088_I2C_Read_Accel(&hi2c1, gbuf) != HAL_OK ) { Error_Handler(); }
+
 	  //buf[0] = 0x1E;
 	  //sprintf(abuf, "0x%02X\n", buf[0]);
 	  //abuf[4] = '\n';
-	  //CDC_Transmit_FS(abuf, 5);
-
+	  CDC_Transmit_FS("TEST \n", 6);
   }
   /* USER CODE END 3 */
 }
