@@ -47,7 +47,7 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-static const uint8_t ACC_ADDR = 0x18 << 1;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -70,7 +70,6 @@ int _write(int file, char *ptr, int len)
   return len;
 }
 
-uint8_t *data = "TEST\n";
 /* USER CODE END 0 */
 
 /**
@@ -83,8 +82,8 @@ int main(void)
   HAL_StatusTypeDef ret; // HAL Status Value
   uint8_t buf[16];
   uint8_t abuf[6];       // Accelerometer Buffer
-  uint8_t gbuf[6];       // Gyroscope Buffer
-  float   obuf[3];       // Output Buffer
+  //uint8_t gbuf[6];       // Gyroscope Buffer
+  //float   obuf[3];       // Output Buffer
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -109,6 +108,8 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
+  // CHECK DEVICE IDENTIFIERS
+  if ( BMI088_I2C_Read_Accel_ID(&hi2c1) != HAL_OK ) { Error_Handler(); }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -122,22 +123,11 @@ int main(void)
 	  HAL_Delay(500);
 	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
 
-	  // CDC_Transmit_FS(data, strlen((char*)data));
-
-	  buf[0] = 0x00;
-	  ret = HAL_I2C_Master_Transmit(&hi2c1, 0x18 << 1, buf, 1, HAL_MAX_DELAY);
-	  if (ret != HAL_OK){
-		  CDC_Transmit_FS("TX ERROR\n", 9);
-	  }
-	  ret = HAL_I2C_Master_Receive(&hi2c1, 0x18 << 1, buf, 1, HAL_MAX_DELAY);
-	  if (ret != HAL_OK){
-	      CDC_Transmit_FS("RX ERROR\n", 9);
-	  }
-
 	  //buf[0] = 0x1E;
-	  sprintf(abuf, "0x%02X\n", buf[0]);
-	  abuf[4] = '\n';
-	  CDC_Transmit_FS(abuf, 5);
+	  //sprintf(abuf, "0x%02X\n", buf[0]);
+	  //abuf[4] = '\n';
+	  //CDC_Transmit_FS(abuf, 5);
+
   }
   /* USER CODE END 3 */
 }
@@ -203,7 +193,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.ClockSpeed = 400000;
   hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -261,8 +251,13 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
+
+  CDC_Transmit_FS((uint8_t*)"ERROR\n", 6);
   while (1)
   {
+
   }
   /* USER CODE END Error_Handler_Debug */
 }

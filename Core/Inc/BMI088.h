@@ -2,7 +2,7 @@
  * BMI088.h
  *
  *  Created on: Jan 24, 2021
- *      Author: matth
+ *      Author: Matthew Morawiec
  */
 
 #ifndef INC_BMI088_H_
@@ -15,8 +15,12 @@ extern "C" {
 #include "main.h"
 
 /* I2C ADDRESSES */
-#define BMI088_ACCEL_ADDR 0x18
-#define BMI088_GYRO_ADDR  0x68
+#define BMI088_ACC_ADDR  0x18
+#define BMI088_GYRO_ADDR 0x68
+
+/* CHIP IDs */
+#define BMI088_ACC_ID  0x1E
+#define BMI088_GYRO_ID 0x0F
 
 /* ACCELEROMETER REGISTERS */
 #define ACC_CHIP_ID    0x00
@@ -48,6 +52,12 @@ extern "C" {
 #define INT1_INT2_MAP_DATA 0x58
 #define INT3_INT4_IO_CONF  0x16
 #define INT3_INT4_IO_MAP   0x18
+
+/* READ ACCEL AND GYRO CHIP IDS */
+HAL_StatusTypeDef BMI088_I2C_Read_Accel_ID(I2C_HandleTypeDef *hi2c);
+
+/* CUSTOM SETTING INITIALIZATION */
+HAL_StatusTypeDef BMI088_I2C_CORGI_INIT(I2C_HandleTypeDef *hi2c);
 
 /* READ ALL ACCELEROMETER DATA */
 HAL_StatusTypeDef BMI088_I2C_Read_Accel(I2C_HandleTypeDef *hi2c, uint8_t *pData);
