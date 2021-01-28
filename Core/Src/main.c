@@ -47,7 +47,7 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-
+const double pi = 3.14159265;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -64,8 +64,7 @@ static void MX_I2C1_Init(void);
 /* Overload the _write function so that printf goes to the debug console */
 int _write(int file, char *ptr, int len)
 {
-  int i=0;
-  for(i=0 ; i<len ; i++)
+  for(int i = 0; i < len; i++)
     ITM_SendChar((*ptr++));
   return len;
 }
@@ -80,9 +79,17 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   //HAL_StatusTypeDef ret; // HAL Status Value
-  uint8_t buf[16];       // General Buffer
-  uint8_t gbuf[6];       // Gyroscope Buffer
-  float   obuf[3];       // Output Buffer
+  //uint8_t buf[16];       // General Buffer
+  //int16_t raw_buf[3];    // Gyroscope Raw Data Buffer
+
+  /* GYROSCOPE BYTE BUFFER */
+  uint8_t gyro_buf[6];
+  /* GYROSCOPE PROCESSED DATA BUFFER */
+  double  rate_buf[3];
+  /* SERIAL TRANSMIT BUFFER */
+  char    tx_buf[64];
+  /* TEMPVAR FOR GYROSCOPE CONVERSIONS */
+  int16_t temp;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -112,7 +119,11 @@ int main(void)
 
   // RUN BMI088 INITIALIZATION
   if ( BMI088_I2C_CORGI_INIT(&hi2c1) != HAL_OK ) { Error_Handler(); };
-  int16_t test;
+
+  // Get starting time
+
+  // Initialize Orientation
+  double rot[] = {0.0, 0.0, 0.0};
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -122,17 +133,26 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
-	  HAL_Delay(500);
-	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
+	  //HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
+	  HAL_Delay(20);
+	  //HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
 
 	  // if ( BMI088_I2C_Read_Accel(&hi2c1, abuf) != HAL_OK ) { Error_Handler(); }
-	  if ( BMI088_I2C_Read_Gyro (&hi2c1, gbuf) != HAL_OK ) { Error_Handler(); }
+	  if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
 
-	  test = gbuf[1] << 8 | gbuf[0];
-	  //sprintf(abuf, "0x%02X\n", buf[0]);
-	  //gbuf[4] = 0xFF;
-	  //CDC_Transmit_FS(gbuf, 6);
+	  // Convert to signed integer and scale to get final values
+	  double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
+	  for (int i = 0; i < 3; i++){
+		  // Assemble unsigned integer data
+		  temp = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
+		  // Convert to rad/s
+		  rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
+		  // Integrate
+		  rot[i] = rot[i] + 0.02*rate_buf[i];
+	  }
+
+	  sprintf(tx_buf, "%f\t%f\t%f\n", rot[0], rot[1], rot[2]);
+	  CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
   }
   /* USER CODE END 3 */
 }
