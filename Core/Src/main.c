@@ -46,17 +46,24 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
-TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim6;
+TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
+// Define pi
 const double pi = 3.14159265;
+// Initialize Orientation
+double rot[] = {0.0, 0.0, 0.0};
+/* SERIAL TRANSMIT BUFFER */
+char tx_buf[64];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_TIM3_Init(void);
+static void MX_TIM7_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -89,14 +96,11 @@ int main(void)
   uint8_t gyro_buf[6];
   /* GYROSCOPE PROCESSED DATA BUFFER */
   double  rate_buf[3];
-  /* SERIAL TRANSMIT BUFFER */
-  char    tx_buf[64];
+  /* VARIABLES FOR TIMEKEEPING */
+  uint16_t tprev;
+  uint16_t telapsed;
   /* TEMPVAR FOR GYROSCOPE CONVERSIONS */
   int16_t temp;
-
-  //for pwm output
-  int32_t CH2_DC = 0;
-  int32_t CH1_DC = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -119,20 +123,22 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_USB_DEVICE_Init();
-  MX_TIM3_Init();
+  MX_TIM7_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+
   // CHECK DEVICE IDENTIFIERS
   if ( BMI088_I2C_Read_CHIP_IDS(&hi2c1) != HAL_OK ) { Error_Handler(); }
 
   // RUN BMI088 INITIALIZATION
   if ( BMI088_I2C_CORGI_INIT(&hi2c1) != HAL_OK ) { Error_Handler(); };
 
-  // Get starting time
+  // START TIMERS
+  HAL_TIM_Base_Start_IT(&htim7);
+  HAL_TIM_Base_Start(&htim6);
 
-  // Initialize Orientation
-  double rot[] = {0.0, 0.0, 0.0};
+  // Get starting time
+  tprev = __HAL_TIM_GET_COUNTER(&htim6);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -142,47 +148,26 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  //HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
-	  HAL_Delay(20);
-	  //HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
+	  // OPTIONAL DELAY
+	  HAL_Delay(5);
 
-	  // if ( BMI088_I2C_Read_Accel(&hi2c1, abuf) != HAL_OK ) { Error_Handler(); }
+	  // READ GYROSCOPE
 	  if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
 
-	  // Convert to signed integer and scale to get final values
+	  // UPDATE TIMER
+	  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
+	  tprev    = tprev + telapsed;
+
+	  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
 	  double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
 	  for (int i = 0; i < 3; i++){
-		  // Assemble unsigned integer data
-		  temp = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-		  // Convert to rad/s
+		  temp        = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
 		  rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
-		  // Integrate
-		  rot[i] = rot[i] + 0.02*rate_buf[i];
+		  rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
 	  }
-
-	  sprintf(tx_buf, "%f\t%f\t%f\n", rot[0], rot[1], rot[2]);
-	  CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
-
-	  while(CH2_DC < 65535)
-	  {
-		  if(rot[2] > 0){
-			  TIM3->CCR2 = CH2_DC;
-		  CH1_DC += 70;
-		  CH2_DC += 70;
-		  HAL_Delay(1);
-		  }
-
-	  }
-	  while(CH1_DC > 0)
-	  {
-		  if(rot[1] < 0){
-		  TIM3->CCR1 = CH1_DC;
-		  CH1_DC -= 70;
-		  CH1_DC -= 70;
-		  HAL_Delay(1);
-		  }
-
-	  }
+	  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
+	  //sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], (int)telapsed);
+	  //CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
   }
   /* USER CODE END 3 */
 }
@@ -203,10 +188,8 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 16;
@@ -221,7 +204,7 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
@@ -267,55 +250,78 @@ static void MX_I2C1_Init(void)
 }
 
 /**
-  * @brief TIM3 Initialization Function
+  * @brief TIM6 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM3_Init(void)
+static void MX_TIM6_Init(void)
 {
 
-  /* USER CODE BEGIN TIM3_Init 0 */
+  /* USER CODE BEGIN TIM6_Init 0 */
 
-  /* USER CODE END TIM3_Init 0 */
+  /* USER CODE END TIM6_Init 0 */
 
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM3_Init 1 */
+  /* USER CODE BEGIN TIM6_Init 1 */
 
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 16 - 1;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 65536 - 1;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM3_Init 2 */
+  /* USER CODE BEGIN TIM6_Init 2 */
 
-  /* USER CODE END TIM3_Init 2 */
-  HAL_TIM_MspPostInit(&htim3);
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 16 - 1;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 20000 - 1;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
 
 }
 
@@ -326,6 +332,7 @@ static void MX_TIM3_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
@@ -333,10 +340,27 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PC6 PC7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if (htim->Instance == TIM7) {
+		// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
+		sprintf(tx_buf, "%f\t%f\t%f\n", rot[0], rot[1], rot[2]);
+		CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
+	}
+}
 /* USER CODE END 4 */
 
 /**
