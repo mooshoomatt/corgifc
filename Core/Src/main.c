@@ -50,12 +50,28 @@ TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
-// Define pi
+
+/* CONSTANTS */
 const double pi = 3.14159265;
-// Initialize Orientation
+const float GYRO_RATE_SCALE = 2000.0;
+
+/* ORIENTATION */
 double rot[] = {0.0, 0.0, 0.0};
-/* SERIAL TRANSMIT BUFFER */
-char tx_buf[64];
+
+/* BUFFERS */
+char    tx_buf[64];   // TX BUFFER
+uint8_t gyro_buf[6];  // GYROSCOPE BYTE BUFFER
+double  rate_buf[3];  // GYROSCOPE RATE BUFFER
+
+/* TIMEKEEPING VARIABLES */
+uint16_t tprev;       // PREVIOUS TIMER VALUE
+uint16_t telapsed;    // ELAPSED CYCLES
+uint16_t tprev_50;       // PREVIOUS TIMER VALUE
+uint16_t telapsed_50;    // ELAPSED CYCLES
+
+/* TEMPVARS */
+int16_t temp;         // (for gyroscope data conversion)
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,12 +88,14 @@ static void MX_TIM6_Init(void);
 /* USER CODE BEGIN 0 */
 
 /* Overload the _write function so that printf goes to the debug console */
+/*
 int _write(int file, char *ptr, int len)
 {
   for(int i = 0; i < len; i++)
     ITM_SendChar((*ptr++));
   return len;
 }
+*/
 
 /* USER CODE END 0 */
 
@@ -88,19 +106,7 @@ int _write(int file, char *ptr, int len)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  //HAL_StatusTypeDef ret; // HAL Status Value
-  //uint8_t buf[16];       // General Buffer
-  //int16_t raw_buf[3];    // Gyroscope Raw Data Buffer
 
-  /* GYROSCOPE BYTE BUFFER */
-  uint8_t gyro_buf[6];
-  /* GYROSCOPE PROCESSED DATA BUFFER */
-  double  rate_buf[3];
-  /* VARIABLES FOR TIMEKEEPING */
-  uint16_t tprev;
-  uint16_t telapsed;
-  /* TEMPVAR FOR GYROSCOPE CONVERSIONS */
-  int16_t temp;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -130,8 +136,8 @@ int main(void)
   // CHECK DEVICE IDENTIFIERS
   if ( BMI088_I2C_Read_CHIP_IDS(&hi2c1) != HAL_OK ) { Error_Handler(); }
 
-  // RUN BMI088 INITIALIZATION
-  if ( BMI088_I2C_CORGI_INIT(&hi2c1) != HAL_OK ) { Error_Handler(); };
+  // RUN BMI088 GYROSCOPE INITIALIZATION
+  if ( BMI088_I2C_GYRO_INIT(&hi2c1) != HAL_OK ) { Error_Handler(); };
 
   // START TIMERS
   HAL_TIM_Base_Start_IT(&htim7);
@@ -139,6 +145,8 @@ int main(void)
 
   // Get starting time
   tprev = __HAL_TIM_GET_COUNTER(&htim6);
+  tprev_50 = tprev;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -149,22 +157,22 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  // OPTIONAL DELAY
-	  HAL_Delay(5);
+	  // HAL_Delay(5);
 
 	  // READ GYROSCOPE
-	  if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
+	  // if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
 
 	  // UPDATE TIMER
-	  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
-	  tprev    = tprev + telapsed;
+	  // telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
+	  // tprev    = tprev + telapsed;
 
 	  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
-	  double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
-	  for (int i = 0; i < 3; i++){
-		  temp        = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-		  rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
-		  rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
-	  }
+	  // double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
+	  // for (int i = 0; i < 3; i++){
+	  //    temp        = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
+	  //    rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
+	  //    rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
+	  // }
 	  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
 	  //sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], (int)telapsed);
 	  //CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
@@ -194,7 +202,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 16;
   RCC_OscInitStruct.PLL.PLLN = 192;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -204,12 +212,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -231,7 +239,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.ClockSpeed = 400000;
   hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -267,7 +275,7 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 16 - 1;
+  htim6.Init.Prescaler = 48 - 1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim6.Init.Period = 65536 - 1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -305,7 +313,7 @@ static void MX_TIM7_Init(void)
 
   /* USER CODE END TIM7_Init 1 */
   htim7.Instance = TIM7;
-  htim7.Init.Prescaler = 16 - 1;
+  htim7.Init.Prescaler = 48 - 1;
   htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim7.Init.Period = 20000 - 1;
   htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -335,13 +343,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : GYRO_INT_Pin */
+  GPIO_InitStruct.Pin = GYRO_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GYRO_INT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PC6 PC7 */
   GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
@@ -350,14 +364,44 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 }
 
 /* USER CODE BEGIN 4 */
+/* GYROSCOPE DATA READY INTERRUPT CALLBACK */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin == GPIO_PIN_14)
+	{
+		// READ GYROSCOPE
+	    if ( BMI088_I2C_Read_Gyro(&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
+
+	    // UPDATE TIMER
+	    telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
+	    tprev    = tprev + telapsed;
+
+		// CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
+	    for (int i = 0; i < 3; i++)
+	    {
+	    	temp = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
+	    	rate_buf[i] = ((double)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
+	    	rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
+		}
+	}
+}
+
+/* TIMER INTERRUPT FOR 50Hz UPDATE OVER SERIAL */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM7) {
+		telapsed_50 = __HAL_TIM_GET_COUNTER(&htim6) - tprev_50;
+	    tprev_50    = tprev_50 + telapsed_50;
+
 		// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
-		sprintf(tx_buf, "%f\t%f\t%f\n", rot[0], rot[1], rot[2]);
+		sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], telapsed);
 		CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
 	}
 }
