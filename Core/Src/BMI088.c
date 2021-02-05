@@ -42,12 +42,7 @@ HAL_StatusTypeDef BMI088_I2C_GYRO_INIT(I2C_HandleTypeDef *hi2c)
 	// DATA RATE: 2000 HZ    1000 HZ    [400 HZ]
 	// BANDWIDTH: 532 HZ    230 HZ    116 Hz    [47 HZ]
 	buf[0] = 0x83;
-	ret = (ret | BMI088_I2C_Reg_Write(hi2c, BMI088_GYRO_ADDR, GYRO_BANDWIDTH, buf));
-
-	// ENABLE GYROSCOPE DATA-READY INTERRUPT
-	ret    |= BMI088_I2C_Reg_Read(hi2c, BMI088_GYRO_ADDR, GYRO_INT_CTRL, buf);
-	buf[0] |= 0x80;
-	ret    |= BMI088_I2C_Reg_Write(hi2c, BMI088_GYRO_ADDR, GYRO_INT_CTRL, buf);
+	ret    |= BMI088_I2C_Reg_Write(hi2c, BMI088_GYRO_ADDR, GYRO_BANDWIDTH, buf);
 
 	// SET GYROSCOPE INT3 MODE TO PUSH-PULL
 	ret    |= BMI088_I2C_Reg_Read(hi2c, BMI088_GYRO_ADDR, INT3_INT4_IO_CONF, buf);
@@ -58,6 +53,11 @@ HAL_StatusTypeDef BMI088_I2C_GYRO_INIT(I2C_HandleTypeDef *hi2c)
 	ret    |= BMI088_I2C_Reg_Read(hi2c, BMI088_GYRO_ADDR, INT3_INT4_IO_MAP, buf);
 	buf[0] |= 0x01;
 	ret    |= BMI088_I2C_Reg_Write(hi2c, BMI088_GYRO_ADDR, INT3_INT4_IO_MAP, buf);
+
+	// ENABLE GYROSCOPE DATA-READY INTERRUPT
+	ret    |= BMI088_I2C_Reg_Read(hi2c, BMI088_GYRO_ADDR, GYRO_INT_CTRL, buf);
+	buf[0] |= 0x80;
+	ret    |= BMI088_I2C_Reg_Write(hi2c, BMI088_GYRO_ADDR, GYRO_INT_CTRL, buf);
 
 	return ret;
 }

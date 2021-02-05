@@ -54,14 +54,20 @@ TIM_HandleTypeDef htim7;
 /* CONSTANTS */
 const double pi = 3.14159265;
 const float GYRO_RATE_SCALE = 2000.0;
+const float RATES[] = {XRATE, YRATE, ZRATE};
 
 /* ORIENTATION */
 double rot[] = {0.0, 0.0, 0.0};
 
+/* SETPOINT */
+double set[] = {0.0, 0.0, 0.0};
+
 /* BUFFERS */
-char    tx_buf[64];   // TX BUFFER
-uint8_t gyro_buf[6];  // GYROSCOPE BYTE BUFFER
-double  rate_buf[3];  // GYROSCOPE RATE BUFFER
+char    tx_buf[64];    // TX BUFFER
+uint8_t gyro_buf[6];   // GYROSCOPE BYTE BUFFER
+
+double  gyro_rate[]  = {0.0, 0.0, 0.0}; // GYROSCOPE RATE BUFFER
+double  stick_rate[] = {0.0, 0.0, 0.0}; // CONTROL RATE BUFFER
 
 /* TIMEKEEPING VARIABLES */
 uint16_t tprev;       // PREVIOUS TIMER VALUE
@@ -147,6 +153,9 @@ int main(void)
   tprev = __HAL_TIM_GET_COUNTER(&htim6);
   tprev_50 = tprev;
 
+  // TURN ON STATUS LED
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -156,26 +165,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  // OPTIONAL DELAY
-	  // HAL_Delay(5);
 
-	  // READ GYROSCOPE
-	  // if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
 
-	  // UPDATE TIMER
-	  // telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
-	  // tprev    = tprev + telapsed;
 
-	  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
-	  // double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
-	  // for (int i = 0; i < 3; i++){
-	  //    temp        = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-	  //    rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
-	  //    rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
-	  // }
-	  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
-	  //sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], (int)telapsed);
-	  //CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
   }
   /* USER CODE END 3 */
 }
@@ -201,9 +193,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 16;
-  RCC_OscInitStruct.PLL.PLLN = 192;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLN = 288;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 6;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -214,10 +206,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV4;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
   {
     Error_Handler();
   }
@@ -275,7 +267,7 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 48 - 1;
+  htim6.Init.Prescaler = 72 - 1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim6.Init.Period = 65536 - 1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -313,7 +305,7 @@ static void MX_TIM7_Init(void)
 
   /* USER CODE END TIM7_Init 1 */
   htim7.Instance = TIM7;
-  htim7.Init.Prescaler = 48 - 1;
+  htim7.Init.Prescaler = 72 - 1;
   htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim7.Init.Period = 20000 - 1;
   htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -374,6 +366,7 @@ static void MX_GPIO_Init(void)
 /* GYROSCOPE DATA READY INTERRUPT CALLBACK */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	// LOOP TAKES ~250us @ 144MHz
 	if (GPIO_Pin == GPIO_PIN_14)
 	{
 		// READ GYROSCOPE
@@ -386,9 +379,33 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		// CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
 	    for (int i = 0; i < 3; i++)
 	    {
-	    	temp = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-	    	rate_buf[i] = ((double)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
-	    	rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
+	    	temp         = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
+	    	gyro_rate[i] = ((double)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
+	    	rot[i]       = rot[i] + 0.000001*(double)telapsed*gyro_rate[i];
+		}
+
+	    // UPDATE ROTATION SETPOINT
+	    for (int i = 0; i < 3; i++)
+	    {
+	    	// {TODO} GET PWM RAW DATA
+	    	// {TODO} CONVERT PWM DATA
+	    	// {TODO} CALCULTE stick_rate[i] as a function of RATES[i]
+	    	set[i] = set[i] + 0.000001*(double)telapsed*stick_rate[i];
+	    }
+
+	    // IMPLEMENT PID ALGORITHM
+	    for (int i = 0; i < 3; i++)
+	    {
+	    	// {TODO} CALCULATE AXIS ERROR
+	    	// {TODO} CALCULATE P TERM
+	    	// {TODO} CALCULATE I TERM
+	    	// {TODO} CALCULATE D TERM
+	    }
+
+	    // UPDATE MOTOR SETTINGS
+	    for (int i = 0; i < 3; i++)
+		{
+			// {TODO} UPDATE AXIS PWM RATE
 		}
 	}
 }
@@ -397,9 +414,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM7) {
-		telapsed_50 = __HAL_TIM_GET_COUNTER(&htim6) - tprev_50;
-	    tprev_50    = tprev_50 + telapsed_50;
-
 		// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
 		sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], telapsed);
 		CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
@@ -415,14 +429,19 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
+
   __disable_irq();
+
+  // {TODO} SET ALL MOTOR OUTPUTS TO ZERO!
+
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
 
   CDC_Transmit_FS((uint8_t*)"ERROR\n", 6);
+
   while (1)
   {
-
+	  // {TODO} RETRY SENSOR CONNECTION RESTART MAIN() IF SUCCESSFUL
   }
   /* USER CODE END Error_Handler_Debug */
 }
