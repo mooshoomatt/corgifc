@@ -92,15 +92,7 @@ int main(void)
   //uint8_t buf[16];       // General Buffer
   //int16_t raw_buf[3];    // Gyroscope Raw Data Buffer
 
-  /* GYROSCOPE BYTE BUFFER */
-  uint8_t gyro_buf[6];
-  /* GYROSCOPE PROCESSED DATA BUFFER */
-  double  rate_buf[3];
-  /* VARIABLES FOR TIMEKEEPING */
-  uint16_t tprev;
-  uint16_t telapsed;
-  /* TEMPVAR FOR GYROSCOPE CONVERSIONS */
-  int16_t temp;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -138,7 +130,7 @@ int main(void)
   HAL_TIM_Base_Start(&htim6);
 
   // Get starting time
-  tprev = __HAL_TIM_GET_COUNTER(&htim6);
+  //tprev = __HAL_TIM_GET_COUNTER(&htim6);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -149,22 +141,9 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  // OPTIONAL DELAY
-	  HAL_Delay(5);
+
 
 	  // READ GYROSCOPE
-	  if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
-
-	  // UPDATE TIMER
-	  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
-	  tprev    = tprev + telapsed;
-
-	  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
-	  double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
-	  for (int i = 0; i < 3; i++){
-		  temp        = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-		  rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
-		  rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
-	  }
 	  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
 	  //sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], (int)telapsed);
 	  //CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
@@ -267,9 +246,9 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 16 - 1;
+  htim6.Init.Prescaler = 0;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 65536 - 1;
+  htim6.Init.Period = 65535;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -355,8 +334,32 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+	 /* GYROSCOPE BYTE BUFFER */
+	  uint8_t gyro_buf[6];
+	  /* GYROSCOPE PROCESSED DATA BUFFER */
+	  double  rate_buf[3];
+	  /* VARIABLES FOR TIMEKEEPING */
+	  uint16_t tprev;
+	  uint16_t telapsed;
+	  /* TEMPVAR FOR GYROSCOPE CONVERSIONS */
+	  int16_t temp;
+	  tprev = __HAL_TIM_GET_COUNTER(&htim6);
 	if (htim->Instance == TIM7) {
 		// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
+		if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
+
+			  // UPDATE TIMER
+			  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
+			  tprev    = tprev + telapsed;
+
+			  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
+			  double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
+			  for (int i = 0; i < 3; i++){
+				  temp        = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
+				  rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
+				  rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
+			  }
+
 		sprintf(tx_buf, "%f\t%f\t%f\n", rot[0], rot[1], rot[2]);
 		CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
 	}
