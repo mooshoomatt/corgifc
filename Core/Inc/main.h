@@ -68,6 +68,10 @@ void Error_Handler(void);
 #define YRATE 5.0
 #define ZRATE 3.0
 
+/* UPDATE FLAG DEFINITIONS */
+#define UPDATE_READY 0x01
+#define UPDATE_RESET 0x00
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

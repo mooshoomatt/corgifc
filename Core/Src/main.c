@@ -51,6 +51,10 @@ TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
 
+/* GLOBAL FLAGS */
+volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG
+volatile uint8_t UPDATE_STATUS = UPDATE_RESET; // UPDATE READY FLAG
+
 /* CONSTANTS */
 const double pi = 3.14159265;
 const float GYRO_RATE_SCALE = 2000.0;
@@ -166,7 +170,63 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+	  // CHECK IF DATA_READY FLAG IS SET
+	  if (DATA_STATUS == DATA_READY)
+	  {
+		  // READ GYROSCOPE
+		  if ( BMI088_I2C_Read_Gyro(&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
 
+		  // UPDATE TIMER
+		  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
+		  tprev    = tprev + telapsed;
+
+		  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
+		  for (int i = 0; i < 3; i++)
+		  {
+			  temp         = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
+			  gyro_rate[i] = ((double)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
+			  rot[i]       = rot[i] + 0.000001*(double)telapsed*gyro_rate[i];
+		  }
+
+		  // UPDATE ROTATION SETPOINT
+		  for (int i = 0; i < 3; i++)
+		  {
+			  // {TODO} GET PWM RAW DATA
+			  // {TODO} CONVERT PWM DATA
+			  // {TODO} CALCULTE stick_rate[i] as a function of RATES[i]
+			  set[i] = set[i] + 0.000001*(double)telapsed*stick_rate[i];
+		  }
+
+		  // IMPLEMENT PID ALGORITHM
+		  for (int i = 0; i < 3; i++)
+		  {
+			  // {TODO} CALCULATE AXIS ERROR
+			  // {TODO} CALCULATE P TERM
+			  // {TODO} CALCULATE I TERM
+			  // {TODO} CALCULATE D TERM
+		  }
+
+		  // UPDATE MOTOR SETTINGS
+		  for (int i = 0; i < 3; i++)
+		  {
+			  // {TODO} UPDATE AXIS PWM RATE
+		  }
+
+		  // RESET DATA_READY FLAG
+		  DATA_STATUS = DATA_RESET;
+	  }
+
+	  // CHECK IF UPDATE_READY FLAG IS SET
+	  if (UPDATE_STATUS == UPDATE_READY)
+	  {
+		  // SEND ORIENTATION DATA OVER VIRTUAL COM PORT
+		  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
+		  sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], telapsed);
+		  CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
+
+		  // RESET UPDATE_READY FLAG
+		  UPDATE_STATUS = UPDATE_RESET;
+	  }
 
   }
   /* USER CODE END 3 */
@@ -363,62 +423,27 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
 /* GYROSCOPE DATA READY INTERRUPT CALLBACK */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	// LOOP TAKES ~250us @ 144MHz
 	if (GPIO_Pin == GPIO_PIN_14)
 	{
-		// READ GYROSCOPE
-	    if ( BMI088_I2C_Read_Gyro(&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
-
-	    // UPDATE TIMER
-	    telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
-	    tprev    = tprev + telapsed;
-
-		// CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
-	    for (int i = 0; i < 3; i++)
-	    {
-	    	temp         = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-	    	gyro_rate[i] = ((double)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
-	    	rot[i]       = rot[i] + 0.000001*(double)telapsed*gyro_rate[i];
-		}
-
-	    // UPDATE ROTATION SETPOINT
-	    for (int i = 0; i < 3; i++)
-	    {
-	    	// {TODO} GET PWM RAW DATA
-	    	// {TODO} CONVERT PWM DATA
-	    	// {TODO} CALCULTE stick_rate[i] as a function of RATES[i]
-	    	set[i] = set[i] + 0.000001*(double)telapsed*stick_rate[i];
-	    }
-
-	    // IMPLEMENT PID ALGORITHM
-	    for (int i = 0; i < 3; i++)
-	    {
-	    	// {TODO} CALCULATE AXIS ERROR
-	    	// {TODO} CALCULATE P TERM
-	    	// {TODO} CALCULATE I TERM
-	    	// {TODO} CALCULATE D TERM
-	    }
-
-	    // UPDATE MOTOR SETTINGS
-	    for (int i = 0; i < 3; i++)
-		{
-			// {TODO} UPDATE AXIS PWM RATE
-		}
+		// SET DATA_READY FLAG
+		DATA_STATUS = DATA_READY;
 	}
 }
 
 /* TIMER INTERRUPT FOR 50Hz UPDATE OVER SERIAL */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM7) {
-		// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
-		sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], telapsed);
-		CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
+	if (htim->Instance == TIM7)
+	{
+		// SET UPDATE_READY FLAG
+		UPDATE_STATUS = UPDATE_READY;
 	}
 }
+
 /* USER CODE END 4 */
 
 /**

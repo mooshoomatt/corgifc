@@ -62,6 +62,9 @@ extern "C" {
 #define GYRO_MODE_SUSPEND      0x80
 #define GYRO_MODE_DEEP_SUSPEND 0x20
 
+#define DATA_READY             0x01
+#define DATA_RESET             0x00
+
 /* READ ACCEL AND GYRO CHIP IDS */
 HAL_StatusTypeDef BMI088_I2C_Read_CHIP_IDS(I2C_HandleTypeDef *hi2c);
 
