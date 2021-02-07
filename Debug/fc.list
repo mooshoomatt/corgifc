@@ -1302,8 +1302,8 @@ HAL_StatusTypeDef BMI088_I2C_GYRO_INIT(I2C_HandleTypeDef *hi2c)
 	// SET GYROSCOPE DATA RATE AND BANDWIDTH
 	// DATA RATE: 2000 HZ    1000 HZ    [400 HZ]
 	// BANDWIDTH: 532 HZ    230 HZ    116 Hz    [47 HZ]
-	buf[0] = 0x81;
- 8000f2a:	2381      	movs	r3, #129	; 0x81
+	buf[0] = 0x80;
+ 8000f2a:	2380      	movs	r3, #128	; 0x80
  8000f2c:	733b      	strb	r3, [r7, #12]
 	ret    |= BMI088_I2C_Reg_Write(hi2c, BMI088_GYRO_ADDR, GYRO_BANDWIDTH, buf);
  8000f2e:	f107 030c 	add.w	r3, r7, #12

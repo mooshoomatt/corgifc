@@ -74,13 +74,13 @@ double  gyro_rate[]  = {0.0, 0.0, 0.0}; // GYROSCOPE RATE BUFFER
 double  stick_rate[] = {0.0, 0.0, 0.0}; // CONTROL RATE BUFFER
 
 /* TIMEKEEPING VARIABLES */
-uint16_t tprev;       // PREVIOUS TIMER VALUE
-uint16_t telapsed;    // ELAPSED CYCLES
-uint16_t tprev_50;       // PREVIOUS TIMER VALUE
-uint16_t telapsed_50;    // ELAPSED CYCLES
+uint16_t tprev;         // PREVIOUS TIMER VALUE
+uint16_t telapsed;      // ELAPSED CYCLES
+uint16_t tprev_50;      // PREVIOUS TIMER VALUE
+uint16_t telapsed_50;   // ELAPSED CYCLES
 
 /* TEMPVARS */
-int16_t temp;         // (for gyroscope data conversion)
+int16_t temp;           // (for gyroscope data conversion)
 
 /* USER CODE END PV */
 
