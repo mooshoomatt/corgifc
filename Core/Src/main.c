@@ -27,6 +27,7 @@
 #include "string.h"
 #include "usbd_cdc_if.h"
 #include "BMI088.h"
+#include "PID1.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,36 +52,17 @@ TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
 
+/* PID CONTROLLER */
+PID1 PID;
+
 /* GLOBAL FLAGS */
 volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG
 volatile uint8_t UPDATE_STATUS = UPDATE_RESET; // UPDATE READY FLAG
 
-/* CONSTANTS */
-const double pi = 3.14159265;
-const float GYRO_RATE_SCALE = 2000.0;
-const float RATES[] = {XRATE, YRATE, ZRATE};
-
-/* ORIENTATION */
-double rot[] = {0.0, 0.0, 0.0};
-
-/* SETPOINT */
-double set[] = {0.0, 0.0, 0.0};
-
-/* BUFFERS */
-char    tx_buf[64];    // TX BUFFER
-uint8_t gyro_buf[6];   // GYROSCOPE BYTE BUFFER
-
-double  gyro_rate[]  = {0.0, 0.0, 0.0}; // GYROSCOPE RATE BUFFER
-double  stick_rate[] = {0.0, 0.0, 0.0}; // CONTROL RATE BUFFER
-
-/* TIMEKEEPING VARIABLES */
-uint16_t tprev;         // PREVIOUS TIMER VALUE
-uint16_t telapsed;      // ELAPSED CYCLES
-uint16_t tprev_50;      // PREVIOUS TIMER VALUE
-uint16_t telapsed_50;   // ELAPSED CYCLES
-
-/* TEMPVARS */
-int16_t temp;           // (for gyroscope data conversion)
+/* PID GAINS */
+const float Kp = 1.0;
+const float Ki = 0.1;
+const float Kd = 0.0;
 
 /* USER CODE END PV */
 
@@ -117,6 +99,31 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 
+  /* CONSTANTS */
+  const float pi = 3.14159265;
+  const float GYRO_RATE_SCALE = 2000.0;
+  const float RATES[] = {XRATE, YRATE, ZRATE};
+
+  /* ORIENTATION */
+  float rot[] = {0.0, 0.0, 0.0};
+
+  /* SETPOINT */
+  float set[] = {0.0, 0.0, 0.0};
+
+  /* TIMEKEEPING VARIABLES */
+  uint16_t tprev;        // PREVIOUS TIMER VALUE
+  uint16_t telapsed;     // ELAPSED CYCLES
+
+  /* BUFFERS */
+  char    tx_buf[64];    // TX BUFFER
+  uint8_t gyro_buf[6];   // GYROSCOPE BYTE BUFFER
+
+  float  gyro_rate[]  = {0.0, 0.0, 0.0}; // GYROSCOPE RATE BUFFER
+  float  stick_rate[] = {0.0, 0.0, 0.0}; // CONTROL RATE BUFFER
+
+  /* TEMPVARS */
+  int16_t temp;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -147,7 +154,13 @@ int main(void)
   if ( BMI088_I2C_Read_CHIP_IDS(&hi2c1) != HAL_OK ) { Error_Handler(); }
 
   // RUN BMI088 GYROSCOPE INITIALIZATION
-  if ( BMI088_I2C_GYRO_INIT(&hi2c1) != HAL_OK ) { Error_Handler(); };
+  if ( BMI088_I2C_GYRO_INIT(&hi2c1) != HAL_OK )     { Error_Handler(); };
+
+  // INITALIZE PID CONTROLLER
+  if ( PID1_Init(&PID, Kp, Ki, Kd) != PID_OK )                   { Error_Handler(); }
+  if ( PID1_Set_Tau(&PID, 0.02) != PID_OK)                       { Error_Handler(); }
+  if ( PID1_Set_Integrator_Limit(&PID, -100.0, 100.0) != PID_OK) { Error_Handler(); }
+  if ( PID1_Set_Output_Limit(&PID, -100.0, 100.0) != PID_OK)     { Error_Handler(); }
 
   // START TIMERS
   HAL_TIM_Base_Start_IT(&htim7);
@@ -155,7 +168,6 @@ int main(void)
 
   // Get starting time
   tprev = __HAL_TIM_GET_COUNTER(&htim6);
-  tprev_50 = tprev;
 
   // TURN ON STATUS LED
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
@@ -184,9 +196,10 @@ int main(void)
 		  for (int i = 0; i < 3; i++)
 		  {
 			  temp         = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-			  gyro_rate[i] = ((double)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
-			  rot[i]       = rot[i] + 0.000001*(double)telapsed*gyro_rate[i];
+			  gyro_rate[i] = ((float)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
+			  rot[i]       = rot[i] + 0.000001*(float)telapsed*gyro_rate[i];
 		  }
+		  PID.meas = rot[0];
 
 		  // UPDATE ROTATION SETPOINT
 		  for (int i = 0; i < 3; i++)
@@ -194,10 +207,11 @@ int main(void)
 			  // {TODO} GET PWM RAW DATA
 			  // {TODO} CONVERT PWM DATA
 			  // {TODO} CALCULTE stick_rate[i] as a function of RATES[i]
-			  set[i] = set[i] + 0.000001*(double)telapsed*stick_rate[i];
+			  set[i] = set[i] + 0.000001*(float)telapsed*stick_rate[i];
 		  }
 
 		  // IMPLEMENT PID ALGORITHM
+		  if (PID1_Update(&PID, 0.000001*(float)telapsed) != PID_OK) { Error_Handler(); }
 		  for (int i = 0; i < 3; i++)
 		  {
 			  // {TODO} CALCULATE AXIS ERROR
@@ -221,7 +235,7 @@ int main(void)
 	  {
 		  // SEND ORIENTATION DATA OVER VIRTUAL COM PORT
 		  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
-		  sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], telapsed);
+		  sprintf(tx_buf, "%f\t%f\t%f\t%f\n", rot[0], rot[1], rot[2], PID.output);
 		  CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
 
 		  // RESET UPDATE_READY FLAG
