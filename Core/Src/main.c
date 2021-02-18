@@ -85,39 +85,57 @@ int _write(int file, char *ptr, int len)
     ITM_SendChar((*ptr++));
   return len;
 }
-<<<<<<< Updated upstream
-=======
-*/
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+
+#define IDLE   0
+#define DONE   1
+#define F_CLK  72000000UL
+volatile uint8_t gu8_State = IDLE;
+volatile uint8_t gu8_MSG[35] = {'\0'};
+volatile uint32_t gu32_T1 = 0;
+volatile uint32_t gu32_T2 = 0;
+volatile uint32_t gu32_Ticks = 0;
+volatile uint16_t gu16_TIM3_OVC = 0;
+volatile uint32_t gu32_Freq = 0;
+TIM_HandleTypeDef htim3;
+
+int main(void)
 {
-	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)  // rising edge interrupt
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_TIM2_Init();
+   // MX_USART1_UART_Init();
+    HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_2);
+    while (1)
+    {
+    }
+}
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef* htim)
+{
+	if(gu8_State == IDLE)
 	{
-		// read captured value
-		IC_Val1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);  // first value
-
-		if (IC_Val1 != 0)  // if the value is not 0
+		gu32_T1 = TIM3->CCR2;
+		gu16_TIM3_OVC = 0;
+		gu8_State = DONE;
+	}
+	else if(gu8_State == DONE)
+	{
+		gu32_T2 = TIM3->CCR2;
+		gu32_Ticks = (gu32_T2 + (gu16_TIM3_OVC * 65536)) - gu32_T1;
+		gu32_Freq = (uint32_t)(F_CLK/gu32_Ticks);
+		if(gu32_Freq != 0)
 		{
-			// read second value
-			IC_Val2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3); // falling edge value
-
-			// calculate Duty cycle
-
-			Duty_Cycle = (IC_Val2*100/IC_Val1);
-
-			// calculate frequency
-
-			Frequency = (2*HAL_RCC_GetPCLK1Freq()/IC_Val1);
-			// As my timer2 clock is 2X the PCLK1 CLOCK that's why X2.
+		  sprintf(gu8_MSG, "Frequency = %lu Hz\n\r", gu32_Freq);
+		  CDC_Transmit_FS((uint8_t*)gu8_MSG, sizeof(gu8_MSG));
 		}
-
-		else
-		{
-			Duty_Cycle = 0;
-			Frequency = 0;
-		}
+		gu8_State = IDLE;
 	}
 }
->>>>>>> Stashed changes
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+	gu16_TIM3_OVC++;
+}
+
 
 /* USER CODE END 0 */
 
@@ -125,92 +143,87 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
   * @brief  The application entry point.
   * @retval int
   */
-int main(void)
-{
-  /* USER CODE BEGIN 1 */
-  //HAL_StatusTypeDef ret; // HAL Status Value
-  //uint8_t buf[16];       // General Buffer
-  //int16_t raw_buf[3];    // Gyroscope Raw Data Buffer
-
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_I2C1_Init();
-  MX_USB_DEVICE_Init();
-  MX_TIM7_Init();
-  MX_TIM6_Init();
-  MX_TIM2_Init();
-  MX_TIM3_Init();
-  /* USER CODE BEGIN 2 */
-
-<<<<<<< Updated upstream
-  // CHECK DEVICE IDENTIFIERS
-  if ( BMI088_I2C_Read_CHIP_IDS(&hi2c1) != HAL_OK ) { Error_Handler(); }
-
-  // RUN BMI088 INITIALIZATION
-  if ( BMI088_I2C_CORGI_INIT(&hi2c1) != HAL_OK ) { Error_Handler(); };
-
-=======
->>>>>>> Stashed changes
-  // START TIMERS
-  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_2);
-  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_3);
-
-  // Get starting time
-<<<<<<< Updated upstream
-  //tprev = __HAL_TIM_GET_COUNTER(&htim6);
-=======
-
-  // TURN ON STATUS LED
-  //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
-
->>>>>>> Stashed changes
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-<<<<<<< Updated upstream
-	  // OPTIONAL DELAY
-
-
-	  // READ GYROSCOPE
-	  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
-	  //sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], (int)telapsed);
-	  //CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
-=======
-	rot[0] = Frequency;
-	rot[1] = Duty_Cycle;
-
-	sprintf(tx_buf, "%f\t%f\n", rot[0], rot[1]);
-	CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
-	HAL_Delay (10);
->>>>>>> Stashed changes
-  }
-  /* USER CODE END 3 */
-}
+//int main(void)
+//{
+//  /* USER CODE BEGIN 1 */
+//  //HAL_StatusTypeDef ret; // HAL Status Value
+//  //uint8_t buf[16];       // General Buffer
+//  //int16_t raw_buf[3];    // Gyroscope Raw Data Buffer
+//
+//
+//  /* USER CODE END 1 */
+//
+//  /* MCU Configuration--------------------------------------------------------*/
+//
+//  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+//  HAL_Init();
+//
+//  /* USER CODE BEGIN Init */
+//
+//  /* USER CODE END Init */
+//
+//  /* Configure the system clock */
+//  SystemClock_Config();
+//
+//  /* USER CODE BEGIN SysInit */
+//
+//  /* USER CODE END SysInit */
+//
+//  /* Initialize all configured peripherals */
+//  MX_GPIO_Init();
+//  MX_I2C1_Init();
+//  MX_USB_DEVICE_Init();
+//  MX_TIM7_Init();
+//  MX_TIM6_Init();
+//  MX_TIM2_Init();
+//  MX_TIM3_Init();
+//  /* USER CODE BEGIN 2 */
+//
+//
+//  // CHECK DEVICE IDENTIFIERS
+//  if ( BMI088_I2C_Read_CHIP_IDS(&hi2c1) != HAL_OK ) { Error_Handler(); }
+//
+//  // RUN BMI088 INITIALIZATION
+//  if ( BMI088_I2C_CORGI_INIT(&hi2c1) != HAL_OK ) { Error_Handler(); };
+//
+//
+//  // START TIMERS
+//  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_2);
+//  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_3);
+//
+//  // Get starting time
+//
+//  // TURN ON STATUS LED
+//  //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+//
+//  /* USER CODE END 2 */
+//
+//  /* Infinite loop */
+//  /* USER CODE BEGIN WHILE */
+//  while (1)
+//  {
+//    /* USER CODE END WHILE */
+//
+//    /* USER CODE BEGIN 3 */
+//
+//	  // OPTIONAL DELAY
+//
+//
+//	  // READ GYROSCOPE
+//	  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
+//	  //sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], (int)telapsed);
+//	  //CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
+//
+//	rot[0] = Frequency;
+//	rot[1] = Duty_Cycle;
+//
+//	sprintf(tx_buf, "%f\t%f\n", rot[0], rot[1]);
+//	CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
+//	HAL_Delay (10);
+//
+//  }
+//  /* USER CODE END 3 */
+//}
 
 /**
   * @brief System Clock Configuration
@@ -301,7 +314,6 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 0 */
 
-  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_IC_InitTypeDef sConfigIC = {0};
 
@@ -314,19 +326,7 @@ static void MX_TIM2_Init(void)
   htim2.Init.Period = 0xffff-1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
   if (HAL_TIM_IC_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
-  sSlaveConfig.InputTrigger = TIM_TS_TI2FP2;
-  sSlaveConfig.TriggerPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
-  sSlaveConfig.TriggerFilter = 0;
-  if (HAL_TIM_SlaveConfigSynchro(&htim2, &sSlaveConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -367,7 +367,6 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 0 */
 
-  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_IC_InitTypeDef sConfigIC = {0};
 
@@ -377,22 +376,10 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 0xffff - 1;
+  htim3.Init.Period = 65535;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_IC_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
-  sSlaveConfig.InputTrigger = TIM_TS_TI2FP2;
-  sSlaveConfig.TriggerPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
-  sSlaveConfig.TriggerFilter = 0;
-  if (HAL_TIM_SlaveConfigSynchro(&htim3, &sSlaveConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -439,9 +426,9 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 0;
+  htim6.Init.Prescaler = 72 - 1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 65535;
+  htim6.Init.Period = 65536 - 1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -508,9 +495,9 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
@@ -525,44 +512,39 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-<<<<<<< Updated upstream
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	 /* GYROSCOPE BYTE BUFFER */
-	  uint8_t gyro_buf[6];
-	  /* GYROSCOPE PROCESSED DATA BUFFER */
-	  double  rate_buf[3];
-	  /* VARIABLES FOR TIMEKEEPING */
-	  uint16_t tprev;
-	  uint16_t telapsed;
-	  /* TEMPVAR FOR GYROSCOPE CONVERSIONS */
-	  int16_t temp;
-	  tprev = __HAL_TIM_GET_COUNTER(&htim6);
-	if (htim->Instance == TIM7) {
-		// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
-		if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
 
-			  // UPDATE TIMER
-			  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
-			  tprev    = tprev + telapsed;
-
-			  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
-			  double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
-			  for (int i = 0; i < 3; i++){
-				  temp        = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-				  rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
-				  rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
-			  }
-
-		sprintf(tx_buf, "%f\t%f\t%f\n", rot[0], rot[1], rot[2]);
-		CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
-	}
-}
-=======
-
-
-
->>>>>>> Stashed changes
+//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+//{
+//	 /* GYROSCOPE BYTE BUFFER */
+//	  uint8_t gyro_buf[6];
+//	  /* GYROSCOPE PROCESSED DATA BUFFER */
+//	  double  rate_buf[3];
+//	  /* VARIABLES FOR TIMEKEEPING */
+//	  uint16_t tprev;
+//	  uint16_t telapsed;
+//	  /* TEMPVAR FOR GYROSCOPE CONVERSIONS */
+//	  int16_t temp;
+//	  tprev = __HAL_TIM_GET_COUNTER(&htim6);
+//	if (htim->Instance == TIM7) {
+//		// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
+//		if ( BMI088_I2C_Read_Gyro (&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
+//
+//			  // UPDATE TIMER
+//			  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
+//			  tprev    = tprev + telapsed;
+//
+//			  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
+//			  double max_rate = 2000.0; // DEPENDS ON GYRO CONFIG
+//			  for (int i = 0; i < 3; i++){
+//				  temp        = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
+//				  rate_buf[i] = ((double)temp*max_rate*pi)/(32767.0*180.0);
+//				  rot[i]      = rot[i] + 0.000001*(double)telapsed*rate_buf[i];
+//			  }
+//
+//		sprintf(tx_buf, "%f\t%f\t%f\n", rot[0], rot[1], rot[2]);
+//		CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
+//	}
+//}
 /* USER CODE END 4 */
 
 /**
