@@ -46,41 +46,15 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
 
-/* GLOBAL FLAGS */
-volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG
-volatile uint8_t UPDATE_STATUS = UPDATE_RESET; // UPDATE READY FLAG
-
-/* CONSTANTS */
-const double pi = 3.14159265;
-const float GYRO_RATE_SCALE = 2000.0;
-const float RATES[] = {XRATE, YRATE, ZRATE};
-
-/* ORIENTATION */
-double rot[] = {0.0, 0.0, 0.0};
-
-/* SETPOINT */
-double set[] = {0.0, 0.0, 0.0};
-
-/* BUFFERS */
-char    tx_buf[64];    // TX BUFFER
-uint8_t gyro_buf[6];   // GYROSCOPE BYTE BUFFER
-
-double  gyro_rate[]  = {0.0, 0.0, 0.0}; // GYROSCOPE RATE BUFFER
-double  stick_rate[] = {0.0, 0.0, 0.0}; // CONTROL RATE BUFFER
-
 /* TIMEKEEPING VARIABLES */
 uint16_t tprev;         // PREVIOUS TIMER VALUE
 uint16_t telapsed;      // ELAPSED CYCLES
-uint16_t tprev_50;      // PREVIOUS TIMER VALUE
-uint16_t telapsed_50;   // ELAPSED CYCLES
-
-/* TEMPVARS */
-int16_t temp;           // (for gyroscope data conversion)
 
 /* USER CODE END PV */
 
@@ -90,22 +64,13 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM7_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-/* Overload the _write function so that printf goes to the debug console */
-/*
-int _write(int file, char *ptr, int len)
-{
-  for(int i = 0; i < len; i++)
-    ITM_SendChar((*ptr++));
-  return len;
-}
-*/
 
 /* USER CODE END 0 */
 
@@ -141,6 +106,7 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_TIM7_Init();
   MX_TIM6_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   // CHECK DEVICE IDENTIFIERS
@@ -152,14 +118,15 @@ int main(void)
   // START TIMERS
   HAL_TIM_Base_Start_IT(&htim7);
   HAL_TIM_Base_Start(&htim6);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 
   // Get starting time
   tprev = __HAL_TIM_GET_COUNTER(&htim6);
-  tprev_50 = tprev;
 
   // TURN ON STATUS LED
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
 
+  TIM2->CCR1 = 9000 - 1;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -169,65 +136,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-	  // CHECK IF DATA_READY FLAG IS SET
-	  if (DATA_STATUS == DATA_READY)
-	  {
-		  // READ GYROSCOPE
-		  if ( BMI088_I2C_Read_Gyro(&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
-
-		  // UPDATE TIMER
-		  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
-		  tprev    = tprev + telapsed;
-
-		  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
-		  for (int i = 0; i < 3; i++)
-		  {
-			  temp         = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-			  gyro_rate[i] = ((double)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
-			  rot[i]       = rot[i] + 0.000001*(double)telapsed*gyro_rate[i];
-		  }
-
-		  // UPDATE ROTATION SETPOINT
-		  for (int i = 0; i < 3; i++)
-		  {
-			  // {TODO} GET PWM RAW DATA
-			  // {TODO} CONVERT PWM DATA
-			  // {TODO} CALCULTE stick_rate[i] as a function of RATES[i]
-			  set[i] = set[i] + 0.000001*(double)telapsed*stick_rate[i];
-		  }
-
-		  // IMPLEMENT PID ALGORITHM
-		  for (int i = 0; i < 3; i++)
-		  {
-			  // {TODO} CALCULATE AXIS ERROR
-			  // {TODO} CALCULATE P TERM
-			  // {TODO} CALCULATE I TERM
-			  // {TODO} CALCULATE D TERM
-		  }
-
-		  // UPDATE MOTOR SETTINGS
-		  for (int i = 0; i < 3; i++)
-		  {
-			  // {TODO} UPDATE AXIS PWM RATE
-		  }
-
-		  // RESET DATA_READY FLAG
-		  DATA_STATUS = DATA_RESET;
-	  }
-
-	  // CHECK IF UPDATE_READY FLAG IS SET
-	  if (UPDATE_STATUS == UPDATE_READY)
-	  {
-		  // SEND ORIENTATION DATA OVER VIRTUAL COM PORT
-		  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
-		  sprintf(tx_buf, "%f\t%f\t%f\t%i\n", rot[0], rot[1], rot[2], telapsed);
-		  CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
-
-		  // RESET UPDATE_READY FLAG
-		  UPDATE_STATUS = UPDATE_RESET;
-	  }
-
   }
   /* USER CODE END 3 */
 }
@@ -306,6 +214,67 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 1 - 1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 36000 - 1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
 
 }
 
@@ -423,26 +392,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-/* GYROSCOPE DATA READY INTERRUPT CALLBACK */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	if (GPIO_Pin == GPIO_PIN_14)
-	{
-		// SET DATA_READY FLAG
-		DATA_STATUS = DATA_READY;
-	}
-}
-
-/* TIMER INTERRUPT FOR 50Hz UPDATE OVER SERIAL */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	if (htim->Instance == TIM7)
-	{
-		// SET UPDATE_READY FLAG
-		UPDATE_STATUS = UPDATE_READY;
-	}
-}
 
 /* USER CODE END 4 */
 
