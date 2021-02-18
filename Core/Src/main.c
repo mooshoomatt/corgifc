@@ -47,10 +47,16 @@
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
+
+volatile uint8_t IC_Started;
+volatile uint16_t IC_ts1;
+volatile uint16_t IC_ts2;
+volatile uint16_t IC_Elapsed;
 
 /* TIMEKEEPING VARIABLES */
 uint16_t tprev;         // PREVIOUS TIMER VALUE
@@ -65,6 +71,7 @@ static void MX_I2C1_Init(void);
 static void MX_TIM7_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -81,7 +88,7 @@ static void MX_TIM2_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  char buf[64];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -107,6 +114,7 @@ int main(void)
   MX_TIM7_Init();
   MX_TIM6_Init();
   MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
   // CHECK DEVICE IDENTIFIERS
@@ -119,6 +127,10 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim7);
   HAL_TIM_Base_Start(&htim6);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
+  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_1);
 
   // Get starting time
   tprev = __HAL_TIM_GET_COUNTER(&htim6);
@@ -127,6 +139,10 @@ int main(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
 
   TIM2->CCR1 = 9000 - 1;
+  TIM2->CCR2 = 18000 - 1;
+  TIM2->CCR3 = 9000;
+  TIM2->CCR4 = 18000;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -136,6 +152,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  sprintf(buf, "%i\n", IC_Elapsed);
+	  CDC_Transmit_FS(buf, strlen(buf));
+	  HAL_Delay(100);
   }
   /* USER CODE END 3 */
 }
@@ -279,6 +298,66 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 72 - 1;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65536 - 1;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_IC_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief TIM6 Initialization Function
   * @param None
   * @retval None
@@ -392,6 +471,25 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)  // if the interrupt source is channel2
+	{
+		if (IC_Started == 0)
+		{
+			IC_ts1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);								// GET FIRST TIMESTAMP
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
+			IC_Started = 1;																			// UPDATE STATUS
+		}
+		else if (IC_Started == 1)
+		{
+			IC_ts2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);								// GET SECOND TIMESTAMP
+			IC_Elapsed = IC_ts2 - IC_ts1;															// CALCULATE PULSE WIDTH
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
+			IC_Started = 0;																			// UPDATE STATUS
+		}
+	}
+}
 
 /* USER CODE END 4 */
 
