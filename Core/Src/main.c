@@ -48,15 +48,17 @@ I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
 
-volatile uint8_t IC_Started;
-volatile uint16_t IC_ts1;
-volatile uint16_t IC_ts2;
-volatile uint16_t IC_Elapsed;
+/* INPUT CAPTURE VARIABLES */
+volatile uint8_t  IC_Started[6] = {0,0,0,0,0,0};
+volatile uint16_t IC_ts1[6]     = {0,0,0,0,0,0};
+volatile uint16_t IC_ts2[6]     = {0,0,0,0,0,0};
+volatile uint16_t IC_Elapsed[6] = {0,0,0,0,0,0};
 
 /* TIMEKEEPING VARIABLES */
 uint16_t tprev;         // PREVIOUS TIMER VALUE
@@ -72,6 +74,7 @@ static void MX_TIM7_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -88,7 +91,7 @@ static void MX_TIM3_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  char buf[64];
+  uint8_t buf[64];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -115,6 +118,7 @@ int main(void)
   MX_TIM6_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
   // CHECK DEVICE IDENTIFIERS
@@ -123,17 +127,22 @@ int main(void)
   // RUN BMI088 GYROSCOPE INITIALIZATION
   if ( BMI088_I2C_GYRO_INIT(&hi2c1) != HAL_OK ) { Error_Handler(); };
 
-  // START TIMERS
+  // START 50Hz SERIAL UPDATE TIMER
   HAL_TIM_Base_Start_IT(&htim7);
+  // START TIMEKEEPING TIMER
   HAL_TIM_Base_Start(&htim6);
+  // START RX INPUT CAPTURE TIMERS
+  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_2);
+  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_3);
+  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_4);
+  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
+  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
+  // START PWM OUTPUT TIMERS
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
-  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_1);
-
-  // Get starting time
-  tprev = __HAL_TIM_GET_COUNTER(&htim6);
 
   // TURN ON STATUS LED
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
@@ -142,6 +151,9 @@ int main(void)
   TIM2->CCR2 = 18000 - 1;
   TIM2->CCR3 = 9000;
   TIM2->CCR4 = 18000;
+
+  // Get starting time
+  tprev = __HAL_TIM_GET_COUNTER(&htim6);
 
   /* USER CODE END 2 */
 
@@ -152,8 +164,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  sprintf(buf, "%i\n", IC_Elapsed);
-	  CDC_Transmit_FS(buf, strlen(buf));
+	  sprintf((char *)buf, "%i\t%i\t%i\t%i\t%i\t%i\n", IC_Elapsed[0], IC_Elapsed[1], IC_Elapsed[2], IC_Elapsed[3], IC_Elapsed[4], IC_Elapsed[5]);
+	  CDC_Transmit_FS(buf, strlen((char *)buf));
 	  HAL_Delay(100);
   }
   /* USER CODE END 3 */
@@ -358,6 +370,58 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 72 - 1;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65536 - 1;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_IC_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
   * @brief TIM6 Initialization Function
   * @param None
   * @retval None
@@ -471,24 +535,81 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+ * INPUT CAPTURE INTERRUPT HANDLER
+ * Measures pulse widths on the following channels:
+ * TIM3: CH1, CH2, CH3, CH4
+ * TIM4: CH1, CH2
+ */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)  // if the interrupt source is channel2
+	uint8_t idx     = 0; // CHANNEL INDEX
+	uint8_t channel = 0; // TIMER CHANNEL
+
+	// TIMER 3: 4 CHANNELS
+	if (htim == &htim3)
 	{
-		if (IC_Started == 0)
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
 		{
-			IC_ts1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);								// GET FIRST TIMESTAMP
-			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
-			IC_Started = 1;																			// UPDATE STATUS
+			idx     = 0;
+			channel = TIM_CHANNEL_1;
 		}
-		else if (IC_Started == 1)
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
 		{
-			IC_ts2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);								// GET SECOND TIMESTAMP
-			IC_Elapsed = IC_ts2 - IC_ts1;															// CALCULATE PULSE WIDTH
-			__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
-			IC_Started = 0;																			// UPDATE STATUS
+			idx     = 1;
+			channel = TIM_CHANNEL_2;
+		}
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3)
+		{
+			idx     = 2;
+			channel = TIM_CHANNEL_3;
+		}
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4)
+		{
+			idx     = 3;
+			channel = TIM_CHANNEL_4;
+		}
+
+		//  PULSE WIDTH CAPTURE
+		if (IC_Started[idx] == 0) {
+			IC_ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
+			IC_Started[idx] = 0x1;															// UPDATE STATUS
+		} else if (IC_Started[idx] == 1) {
+			IC_ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
+			IC_Elapsed[idx] = IC_ts2[idx] - IC_ts1[idx];									// CALCULATE PULSE WIDTH
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
+			IC_Started[idx] = 0x0;															// UPDATE STATUS
 		}
 	}
+	// TIMER 4: 2 CHANNELS
+	if (htim == &htim4)
+	{
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
+		{
+			idx     = 4;
+			channel = TIM_CHANNEL_1;
+		}
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
+		{
+			idx     = 5;
+			channel = TIM_CHANNEL_2;
+		}
+
+		//  PULSE WIDTH CAPTURE
+		if (IC_Started[idx] == 0) {
+			IC_ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
+			IC_Started[idx] = 0x1;															// UPDATE STATUS
+		} else if (IC_Started[idx] == 1) {
+			IC_ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
+			IC_Elapsed[idx] = IC_ts2[idx] - IC_ts1[idx];									// CALCULATE PULSE WIDTH
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
+			IC_Started[idx] = 0x0;															// UPDATE STATUS
+		}
+	}
+
 }
 
 /* USER CODE END 4 */
