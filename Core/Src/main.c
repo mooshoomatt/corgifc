@@ -23,11 +23,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stdio.h"
-#include "string.h"
+#include <stdio.h>
+#include <string.h>
 #include "usbd_cdc_if.h"
 #include "BMI088.h"
 #include "PID1.h"
+#include "PID3.h"
+#include "oneshot125.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +49,9 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 
@@ -54,6 +59,15 @@ TIM_HandleTypeDef htim7;
 
 /* PID CONTROLLER */
 PID1 PID;
+
+/* ONESHOT125 OUTPUT DRIVER */
+ONESHOT125 OSHOT;
+
+/* INPUT CAPTURE VARIABLES */
+volatile uint8_t  IC_Started[6] = {0,0,0,0,0,0};
+volatile uint16_t IC_ts1[6]     = {0,0,0,0,0,0};
+volatile uint16_t IC_ts2[6]     = {0,0,0,0,0,0};
+volatile uint16_t IC_Elapsed[6] = {0,0,0,0,0,0};
 
 /* GLOBAL FLAGS */
 volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG
@@ -72,7 +86,15 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM7_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
+
+static void PWM_INPUT_START(void);
+static void PWM_OUTPUT_START(void);
+static void PID1_Wrapper_Init(PID1* PID);
+static void OS125_Wrapper_Init(ONESHOT125 *OS, PID3* PID);
 
 /* USER CODE END PFP */
 
@@ -148,6 +170,9 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_TIM7_Init();
   MX_TIM6_Init();
+  MX_TIM2_Init();
+  MX_TIM3_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
   // CHECK DEVICE IDENTIFIERS
@@ -157,20 +182,25 @@ int main(void)
   if ( BMI088_I2C_GYRO_INIT(&hi2c1) != HAL_OK )     { Error_Handler(); };
 
   // INITALIZE PID CONTROLLER
-  if ( PID1_Init(&PID, Kp, Ki, Kd) != PID_OK )                   { Error_Handler(); }
-  if ( PID1_Set_Tau(&PID, 0.02) != PID_OK)                       { Error_Handler(); }
-  if ( PID1_Set_Integrator_Limit(&PID, -100.0, 100.0) != PID_OK) { Error_Handler(); }
-  if ( PID1_Set_Output_Limit(&PID, -100.0, 100.0) != PID_OK)     { Error_Handler(); }
+  PID1_Wrapper_Init(&PID);
 
-  // START TIMERS
+  // INITIALIZE ONESHOT125 OUTPUT DRIVER
+  //OS125_Wrapper_Init(&OSHOT, &PID);
+
+  // START 50Hz SERIAL UPDATE TIMER
   HAL_TIM_Base_Start_IT(&htim7);
+  // START TIMEKEEPING TIMER
   HAL_TIM_Base_Start(&htim6);
-
-  // Get starting time
-  tprev = __HAL_TIM_GET_COUNTER(&htim6);
+  // START RX INPUT CAPTURE TIMERS
+  PWM_INPUT_START();
+  // START PWM OUTPUT TIMERS
+  PWM_OUTPUT_START();
 
   // TURN ON STATUS LED
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+
+  // Get starting time
+  tprev = __HAL_TIM_GET_COUNTER(&htim6);
 
   /* USER CODE END 2 */
 
@@ -234,7 +264,7 @@ int main(void)
 	  if (UPDATE_STATUS == UPDATE_READY)
 	  {
 		  // SEND ORIENTATION DATA OVER VIRTUAL COM PORT
-		  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [COMPUTATION TIME (uSec)]
+		  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [OTHER]
 		  sprintf(tx_buf, "%f\t%f\t%f\t%f\n", rot[0], rot[1], rot[2], PID.output);
 		  CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
 
@@ -320,6 +350,179 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 1 - 1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 36000 - 1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 72 - 1;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65536 - 1;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_IC_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 72 - 1;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65536 - 1;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_IC_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
 
 }
 
@@ -441,21 +644,130 @@ static void MX_GPIO_Init(void)
 /* GYROSCOPE DATA READY INTERRUPT CALLBACK */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if (GPIO_Pin == GPIO_PIN_14)
-	{
-		// SET DATA_READY FLAG
-		DATA_STATUS = DATA_READY;
-	}
+	if (GPIO_Pin == GPIO_PIN_14) { DATA_STATUS = DATA_READY; }    // SET DATA_READY FLAG
 }
 
-/* TIMER INTERRUPT FOR 50Hz UPDATE OVER SERIAL */
+/* TIMER INTERRUPT CALLBACK FOR 50Hz UPDATE OVER SERIAL */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM7)
+	if (htim->Instance == TIM7) { UPDATE_STATUS = UPDATE_READY; } // SET UPDATE_READY FLAG
+}
+
+/**
+ * INPUT CAPTURE INTERRUPT CALLBACK
+ * Measures pulse widths on the following channels:
+ * TIM3: CH1, CH2, CH3, CH4
+ * TIM4: CH1, CH2
+ */
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+	uint8_t idx     = 0; // CHANNEL INDEX
+	uint8_t channel = 0; // TIMER CHANNEL
+
+	// TIMER 3: 4 CHANNELS
+	if (htim == &htim3)
 	{
-		// SET UPDATE_READY FLAG
-		UPDATE_STATUS = UPDATE_READY;
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
+		{
+			idx     = 0;
+			channel = TIM_CHANNEL_1;
+		}
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
+		{
+			idx     = 1;
+			channel = TIM_CHANNEL_2;
+		}
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3)
+		{
+			idx     = 2;
+			channel = TIM_CHANNEL_3;
+		}
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4)
+		{
+			idx     = 3;
+			channel = TIM_CHANNEL_4;
+		}
+
+		//  PULSE WIDTH CAPTURE
+		if (IC_Started[idx] == 0) {
+			IC_ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
+			IC_Started[idx] = 0x1;															// UPDATE STATUS
+		} else if (IC_Started[idx] == 1) {
+			IC_ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
+			IC_Elapsed[idx] = IC_ts2[idx] - IC_ts1[idx];									// CALCULATE PULSE WIDTH
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
+			IC_Started[idx] = 0x0;															// UPDATE STATUS
+		}
 	}
+	// TIMER 4: 2 CHANNELS
+	if (htim == &htim4)
+	{
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
+		{
+			idx     = 4;
+			channel = TIM_CHANNEL_1;
+		}
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
+		{
+			idx     = 5;
+			channel = TIM_CHANNEL_2;
+		}
+
+		//  PULSE WIDTH CAPTURE
+		if (IC_Started[idx] == 0) {
+			IC_ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
+			IC_Started[idx] = 0x1;															// UPDATE STATUS
+		} else if (IC_Started[idx] == 1) {
+			IC_ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
+			IC_Elapsed[idx] = IC_ts2[idx] - IC_ts1[idx];									// CALCULATE PULSE WIDTH
+			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
+			IC_Started[idx] = 0x0;															// UPDATE STATUS
+		}
+	}
+
+}
+
+/* ONESHOT125 INTIALIZATION FUNCTION */
+static void OS125_Wrapper_Init(ONESHOT125 *OS, PID3* PID)
+{
+	OS->htim     = &htim2;
+	OS->command  = PID->out;
+	OS->fclk     = 72000000;
+	OS->fclk_psc = 1 - 1;
+
+	if (OS125_Init(OS) != OS125_OK) { Error_Handler(); };
+}
+
+/* PID INITIALIZATION FUNCTION */
+static void PID1_Wrapper_Init(PID1 *PID)
+{
+	if ( PID1_Init(PID, Kp, Ki, Kd) != PID_OK )                   { Error_Handler(); }
+	if ( PID1_Set_Tau(PID, 0.02) != PID_OK)                       { Error_Handler(); }
+	if ( PID1_Set_Integrator_Limit(PID, -100.0, 100.0) != PID_OK) { Error_Handler(); }
+	if ( PID1_Set_Output_Limit(PID, -100.0, 100.0) != PID_OK)     { Error_Handler(); }
+}
+
+
+/* START INPUT CAPTURE */
+static void PWM_INPUT_START(void)
+{
+	HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_1);
+	HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_2);
+	HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_3);
+	HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_4);
+	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
+	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
+}
+
+/* START PWM OUTPUT */
+static void PWM_OUTPUT_START(void)
+{
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
 }
 
 /* USER CODE END 4 */
