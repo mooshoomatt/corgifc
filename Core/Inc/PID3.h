@@ -29,25 +29,22 @@ typedef uint8_t PID_StatusTypeDef;
 typedef struct {
 
 	/* SETPOINT, ORIENTATION, AND OUTPUT */
-	float set[3];
-	float rot[3];
 	float out[3];
+  //float rot[3] is accessible via the quad struct as quad.rot
+  //float set[3] is accessible via the quad struct as quad.set
 
 	/* GAIN VALUES */
 	float Kp[3];
 	float Ki[3];
 	float Kd[3];
 
-	/* SAMPLING PERIOD (SECONDS) */
-	float T;
-
 	/* INTEGRATOR WIND-UP LIMITS */
-	float intMaxLim;
-	float intMinLim;
+	float intLimMax;
+	float intLimMin;
 
 	/* ABSOLUTE OUTPUT LIMITS */
-	float outMaxLim;
-	float outMinLim;
+	float outLimMax;
+	float outLimMin;
 
 	/* D-TERM LOW-PASS TIME CONSTANT */
 	float tau;
@@ -55,18 +52,26 @@ typedef struct {
 	/* ERROR TEMPVAR */
 	float error[3];
 
+	/* PROPORTIONAL TEMPVAR */
+	float proportional[3];
+
 	/* TEMPVARS FOR INTEGRATOR */
 	float integral[3];
 	float prevError[3];
 
 	/* TEMPVARS FOR DIFFERENTIATOR */
 	float derivative[3];
-	float prevMeas[3];
+	float prevRot[3];
+
+  //float SAMPLING_PERIOD is accessible via the quad struct as quad.telapsed
 
 } PID3;
 
 /* INITIALIZATION FUNCTION */
-PID_StatusTypeDef PID3_Init(PID3 *pid, float *p, float *i, float*d);
+PID_StatusTypeDef PID3_Init(PID3 *pid, const float *p, const float *i, const float*d);
+
+/* SET FILTER TIME CONSTANT */
+PID_StatusTypeDef PID3_Set_Tau(PID3 *pid, float t);
 
 /* SET INTEGRATOR LIMIT */
 PID_StatusTypeDef PID3_Set_Integrator_Limit(PID3 *pid, float min, float max);
@@ -75,6 +80,6 @@ PID_StatusTypeDef PID3_Set_Integrator_Limit(PID3 *pid, float min, float max);
 PID_StatusTypeDef PID3_Set_Output_Limit(PID3 *pid, float min, float max);
 
 /* ADVANCE TIMESTEP FUNCTION */
-PID_StatusTypeDef PID3_Update(PID3 *pid, float T);
+PID_StatusTypeDef PID3_Update(PID3 *pid, float *set, float *rot, float T);
 
 #endif /* INC_PID3_H_ */

@@ -66,7 +66,7 @@ typedef struct {
 } PID1;
 
 /* INITIALIZATION FUNCTION */
-PID_StatusTypeDef PID1_Init(PID1 *pid, float p, float i, float d);
+PID_StatusTypeDef PID1_Init(PID1 *pid, const float p, const float i, const float d);
 
 /* SET FILTER TIME CONSTANT */
 PID_StatusTypeDef PID1_Set_Tau(PID1 *pid, float t);

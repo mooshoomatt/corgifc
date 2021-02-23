@@ -26,10 +26,12 @@
 #include <stdio.h>
 #include <string.h>
 #include "usbd_cdc_if.h"
-#include "BMI088.h"
-#include "PID1.h"
-#include "PID3.h"
+
+#include "quad.h"
 #include "oneshot125.h"
+#include "BMI088.h"
+#include "PID3.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,8 +59,16 @@ TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
 
+/* QUAD STRUCTURE */
+QUAD quad;
+
 /* PID CONTROLLER */
-PID1 PID;
+PID3 PID;
+
+/* PID GAINS */
+const float Kp[] = {1.0, 1.0, 1.0};
+const float Ki[] = {0.1, 1.0, 1.0};
+const float Kd[] = {0.0, 0.0, 0.0};
 
 /* ONESHOT125 OUTPUT DRIVER */
 ONESHOT125 OSHOT;
@@ -73,11 +83,6 @@ volatile uint16_t IC_Elapsed[6] = {0,0,0,0,0,0};
 volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG
 volatile uint8_t UPDATE_STATUS = UPDATE_RESET; // UPDATE READY FLAG
 
-/* PID GAINS */
-const float Kp = 1.0;
-const float Ki = 0.1;
-const float Kd = 0.0;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -91,25 +96,17 @@ static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
+static void QUAD_Wrapper_Init(void);
+static void BMI088_Wrapper_Init(void);
+static void OS125_Wrapper_Init(void);
+static void PID3_Wrapper_Init(void);
 static void PWM_INPUT_START(void);
 static void PWM_OUTPUT_START(void);
-static void PID1_Wrapper_Init(PID1* PID);
-static void OS125_Wrapper_Init(ONESHOT125 *OS, PID3* PID);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-/* Overload the _write function so that printf goes to the debug console */
-/*
-int _write(int file, char *ptr, int len)
-{
-  for(int i = 0; i < len; i++)
-    ITM_SendChar((*ptr++));
-  return len;
-}
-*/
 
 /* USER CODE END 0 */
 
@@ -120,31 +117,6 @@ int _write(int file, char *ptr, int len)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
-  /* CONSTANTS */
-  const float pi = 3.14159265;
-  const float GYRO_RATE_SCALE = 2000.0;
-  const float RATES[] = {XRATE, YRATE, ZRATE};
-
-  /* ORIENTATION */
-  float rot[] = {0.0, 0.0, 0.0};
-
-  /* SETPOINT */
-  float set[] = {0.0, 0.0, 0.0};
-
-  /* TIMEKEEPING VARIABLES */
-  uint16_t tprev;        // PREVIOUS TIMER VALUE
-  uint16_t telapsed;     // ELAPSED CYCLES
-
-  /* BUFFERS */
-  char    tx_buf[64];    // TX BUFFER
-  uint8_t gyro_buf[6];   // GYROSCOPE BYTE BUFFER
-
-  float  gyro_rate[]  = {0.0, 0.0, 0.0}; // GYROSCOPE RATE BUFFER
-  float  stick_rate[] = {0.0, 0.0, 0.0}; // CONTROL RATE BUFFER
-
-  /* TEMPVARS */
-  int16_t temp;
 
   /* USER CODE END 1 */
 
@@ -175,32 +147,19 @@ int main(void)
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
-  // CHECK DEVICE IDENTIFIERS
-  if ( BMI088_I2C_Read_CHIP_IDS(&hi2c1) != HAL_OK ) { Error_Handler(); }
+  HAL_TIM_Base_Start_IT(&htim7);	// START 50Hz SERIAL UPDATE TIMER
+  HAL_TIM_Base_Start(&htim6);    	// START TIMEKEEPING TIMER
 
-  // RUN BMI088 GYROSCOPE INITIALIZATION
-  if ( BMI088_I2C_GYRO_INIT(&hi2c1) != HAL_OK )     { Error_Handler(); };
+  BMI088_Wrapper_Init();			// INITIALIZE GYROSCOPE
+  OS125_Wrapper_Init();				// INITIALIZE ONESHOT125 OUTPUT DRIVER
+  PID3_Wrapper_Init();				// INITALIZE PID CONTROLLER
+  QUAD_Wrapper_Init();				// INITIALIZE QUAD STRUCTURE
 
-  // INITALIZE PID CONTROLLER
-  PID1_Wrapper_Init(&PID);
-
-  // INITIALIZE ONESHOT125 OUTPUT DRIVER
-  //OS125_Wrapper_Init(&OSHOT, &PID);
-
-  // START 50Hz SERIAL UPDATE TIMER
-  HAL_TIM_Base_Start_IT(&htim7);
-  // START TIMEKEEPING TIMER
-  HAL_TIM_Base_Start(&htim6);
-  // START RX INPUT CAPTURE TIMERS
-  PWM_INPUT_START();
-  // START PWM OUTPUT TIMERS
-  PWM_OUTPUT_START();
+  PWM_INPUT_START();             	// START RX INPUT CAPTURE TIMERS
+  PWM_OUTPUT_START();				// START PWM OUTPUT TIMERS
 
   // TURN ON STATUS LED
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
-
-  // Get starting time
-  tprev = __HAL_TIM_GET_COUNTER(&htim6);
 
   /* USER CODE END 2 */
 
@@ -215,46 +174,7 @@ int main(void)
 	  // CHECK IF DATA_READY FLAG IS SET
 	  if (DATA_STATUS == DATA_READY)
 	  {
-		  // READ GYROSCOPE
-		  if ( BMI088_I2C_Read_Gyro(&hi2c1, gyro_buf) != HAL_OK ) { Error_Handler(); }
-
-		  // UPDATE TIMER
-		  telapsed = __HAL_TIM_GET_COUNTER(&htim6) - tprev;
-		  tprev    = tprev + telapsed;
-
-		  // CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
-		  for (int i = 0; i < 3; i++)
-		  {
-			  temp         = gyro_buf[2*i + 1] << 8 | gyro_buf[2*i];
-			  gyro_rate[i] = ((float)temp*GYRO_RATE_SCALE*pi)/(32767.0*180.0);
-			  rot[i]       = rot[i] + 0.000001*(float)telapsed*gyro_rate[i];
-		  }
-		  PID.meas = rot[0];
-
-		  // UPDATE ROTATION SETPOINT
-		  for (int i = 0; i < 3; i++)
-		  {
-			  // {TODO} GET PWM RAW DATA
-			  // {TODO} CONVERT PWM DATA
-			  // {TODO} CALCULTE stick_rate[i] as a function of RATES[i]
-			  set[i] = set[i] + 0.000001*(float)telapsed*stick_rate[i];
-		  }
-
-		  // IMPLEMENT PID ALGORITHM
-		  if (PID1_Update(&PID, 0.000001*(float)telapsed) != PID_OK) { Error_Handler(); }
-		  for (int i = 0; i < 3; i++)
-		  {
-			  // {TODO} CALCULATE AXIS ERROR
-			  // {TODO} CALCULATE P TERM
-			  // {TODO} CALCULATE I TERM
-			  // {TODO} CALCULATE D TERM
-		  }
-
-		  // UPDATE MOTOR SETTINGS
-		  for (int i = 0; i < 3; i++)
-		  {
-			  // {TODO} UPDATE AXIS PWM RATE
-		  }
+		  QUAD_UPDATE(&quad, IC_Elapsed);
 
 		  // RESET DATA_READY FLAG
 		  DATA_STATUS = DATA_RESET;
@@ -263,10 +183,7 @@ int main(void)
 	  // CHECK IF UPDATE_READY FLAG IS SET
 	  if (UPDATE_STATUS == UPDATE_READY)
 	  {
-		  // SEND ORIENTATION DATA OVER VIRTUAL COM PORT
-		  // DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [OTHER]
-		  sprintf(tx_buf, "%f\t%f\t%f\t%f\n", rot[0], rot[1], rot[2], PID.output);
-		  CDC_Transmit_FS((uint8_t*)tx_buf, strlen(tx_buf));
+		  QUAD_SEND_ORIENTATION(&quad);
 
 		  // RESET UPDATE_READY FLAG
 		  UPDATE_STATUS = UPDATE_RESET;
@@ -689,11 +606,11 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 		}
 
 		//  PULSE WIDTH CAPTURE
-		if (IC_Started[idx] == 0) {
+		if (IC_Started[idx] == 0x0) {
 			IC_ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
 			IC_Started[idx] = 0x1;															// UPDATE STATUS
-		} else if (IC_Started[idx] == 1) {
+		} else if (IC_Started[idx] == 0x1) {
 			IC_ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
 			IC_Elapsed[idx] = IC_ts2[idx] - IC_ts1[idx];									// CALCULATE PULSE WIDTH
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
@@ -715,11 +632,11 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 		}
 
 		//  PULSE WIDTH CAPTURE
-		if (IC_Started[idx] == 0) {
+		if (IC_Started[idx] == 0x0) {
 			IC_ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
 			IC_Started[idx] = 0x1;															// UPDATE STATUS
-		} else if (IC_Started[idx] == 1) {
+		} else if (IC_Started[idx] == 0x1) {
 			IC_ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
 			IC_Elapsed[idx] = IC_ts2[idx] - IC_ts1[idx];									// CALCULATE PULSE WIDTH
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
@@ -729,26 +646,43 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 
 }
 
-/* ONESHOT125 INTIALIZATION FUNCTION */
-static void OS125_Wrapper_Init(ONESHOT125 *OS, PID3* PID)
+static void QUAD_Wrapper_Init(void)
 {
-	OS->htim     = &htim2;
-	OS->command  = PID->out;
-	OS->fclk     = 72000000;
-	OS->fclk_psc = 1 - 1;
+	quad.hi2c = &hi2c1;
+	quad.htim = &htim6;
+	quad.OS   = &OSHOT;
+	quad.PID  = &PID;
 
-	if (OS125_Init(OS) != OS125_OK) { Error_Handler(); };
+	QUAD_Init(&quad);
+}
+
+static void BMI088_Wrapper_Init(void)
+{
+	// CHECK DEVICE IDENTIFIERS
+	if ( BMI088_I2C_Read_CHIP_IDS(&hi2c1) != HAL_OK ) { Error_Handler(); }
+	// RUN BMI088 GYROSCOPE INITIALIZATION
+	if ( BMI088_I2C_GYRO_INIT(&hi2c1) != HAL_OK )     { Error_Handler(); };
+}
+
+/* ONESHOT125 INTIALIZATION FUNCTION */
+static void OS125_Wrapper_Init(void)
+{
+	OSHOT.htim     = &htim2;
+	OSHOT.command  = PID.out;
+	OSHOT.fclk     = 72000000;
+	OSHOT.fclk_psc = 1 - 1;
+
+	if (OS125_Init(&OSHOT) != OS125_OK) { Error_Handler(); };
 }
 
 /* PID INITIALIZATION FUNCTION */
-static void PID1_Wrapper_Init(PID1 *PID)
+static void PID3_Wrapper_Init(void)
 {
-	if ( PID1_Init(PID, Kp, Ki, Kd) != PID_OK )                   { Error_Handler(); }
-	if ( PID1_Set_Tau(PID, 0.02) != PID_OK)                       { Error_Handler(); }
-	if ( PID1_Set_Integrator_Limit(PID, -100.0, 100.0) != PID_OK) { Error_Handler(); }
-	if ( PID1_Set_Output_Limit(PID, -100.0, 100.0) != PID_OK)     { Error_Handler(); }
+	if ( PID3_Init(&PID, Kp, Ki, Kd) != PID_OK )                   { Error_Handler(); }
+	if ( PID3_Set_Tau(&PID, 0.02) != PID_OK)                       { Error_Handler(); }
+	if ( PID3_Set_Integrator_Limit(&PID, -100.0, 100.0) != PID_OK) { Error_Handler(); }
+	if ( PID3_Set_Output_Limit(&PID, -100.0, 100.0) != PID_OK)     { Error_Handler(); }
 }
-
 
 /* START INPUT CAPTURE */
 static void PWM_INPUT_START(void)
@@ -783,8 +717,13 @@ void Error_Handler(void)
 
   __disable_irq();
 
-  // {TODO} SET ALL MOTOR OUTPUTS TO ZERO!
+  // DISABLE PWM OUTPUT
+  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_4);
 
+  // SET STATUS LEDS
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
 
@@ -792,7 +731,7 @@ void Error_Handler(void)
 
   while (1)
   {
-	  // {TODO} RETRY SENSOR CONNECTION RESTART MAIN() IF SUCCESSFUL
+
   }
   /* USER CODE END Error_Handler_Debug */
 }
