@@ -70,6 +70,9 @@ typedef struct {
 /* INITIALIZATION FUNCTION */
 PID_StatusTypeDef PID3_Init(PID3 *pid, const float *p, const float *i, const float*d);
 
+/* CLEAR STATE FUNCTION */
+PID_StatusTypeDef PID3_Clear(PID3 *pid);
+
 /* SET FILTER TIME CONSTANT */
 PID_StatusTypeDef PID3_Set_Tau(PID3 *pid, float t);
 

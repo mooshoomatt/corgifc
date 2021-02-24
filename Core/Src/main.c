@@ -83,6 +83,8 @@ volatile uint16_t IC_Elapsed[6] = {0,0,0,0,0,0};
 volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG
 volatile uint8_t UPDATE_STATUS = UPDATE_RESET; // UPDATE READY FLAG
 
+char buf[64];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -184,6 +186,8 @@ int main(void)
 	  if (UPDATE_STATUS == UPDATE_READY)
 	  {
 		  QUAD_SEND_ORIENTATION(&quad);
+		  //sprintf(buf, "%i\t%i\t%i\t%i\t%i\t%i\t\n", IC_Elapsed[0], IC_Elapsed[1], IC_Elapsed[2], IC_Elapsed[3], IC_Elapsed[4], IC_Elapsed[5]);
+		  //CDC_Transmit_FS((uint8_t*)(buf), strlen(buf));
 
 		  // RESET UPDATE_READY FLAG
 		  UPDATE_STATUS = UPDATE_RESET;
@@ -586,22 +590,22 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 	{
 		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
 		{
-			idx     = 0;
+			idx     = 4;
 			channel = TIM_CHANNEL_1;
 		}
 		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
 		{
-			idx     = 1;
+			idx     = 5;
 			channel = TIM_CHANNEL_2;
 		}
 		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3)
 		{
-			idx     = 2;
+			idx     = 3;
 			channel = TIM_CHANNEL_3;
 		}
 		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4)
 		{
-			idx     = 3;
+			idx     = 2;
 			channel = TIM_CHANNEL_4;
 		}
 
@@ -622,12 +626,12 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 	{
 		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
 		{
-			idx     = 4;
+			idx     = 1;
 			channel = TIM_CHANNEL_1;
 		}
 		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
 		{
-			idx     = 5;
+			idx     = 0;
 			channel = TIM_CHANNEL_2;
 		}
 

@@ -26,11 +26,28 @@ PID_StatusTypeDef PID3_Init(PID3 *pid, const float *p, const float *i, const flo
 
 	pid->prevError[0] = 0.0; pid->prevError[1] = 0.0; pid->prevError[2] = 0.0;
 
+	pid->prevRot[0] = 0.0; pid->prevRot[1] = 0.0; pid->prevRot[2] = 0.0;
+
 	/* SET CLAMPS */
 	pid->intLimMax = PID_MAXINT;
 	pid->intLimMin = PID_MININT;
 	pid->outLimMax = PID_MAXOUT;
 	pid->outLimMin = PID_MINOUT;
+
+	return PID_OK;
+}
+
+/* CLEAR STATE FUNCTION */
+PID_StatusTypeDef PID3_Clear(PID3 *pid)
+{
+	/* CLEAR IMPORTANT VARIABLES */
+	pid->out[0] = 0.0; pid->out[1] = 0.0; pid->out[2] = 0.0;
+
+	pid->integral[0] = 0.0; pid->integral[1] = 0.0; pid->integral[2] = 0.0;
+
+	pid->prevError[0] = 0.0; pid->prevError[1] = 0.0; pid->prevError[2] = 0.0;
+
+	pid->prevRot[0] = 0.0; pid->prevRot[1] = 0.0; pid->prevRot[2] = 0.0;
 
 	return PID_OK;
 }

@@ -27,6 +27,8 @@ extern "C" {
 #define Y_DEFAULT_RATE 5.0 // DEFAULT PITCH RATE (rad/s)
 #define Z_DEFAULT_RATE 3.0 // DEFAULT YAW RATE   (rad/s)
 
+#define ARM_CHANNEL 4
+
 typedef struct {
 
 	I2C_HandleTypeDef *hi2c;  // I2C Handle for gyro
@@ -40,18 +42,23 @@ typedef struct {
 	float rot[3];             // MEASURED ROTATION
 	float set[3];             // SETPOINT
 
+	uint8_t ARM_STATUS;       // ARM STATUS
+
 	uint8_t gyro_buf[6];      // GYROSCOPE BYTE BUFFER
 	char tx_buf[64];          // TX BUFFER
 
 	float  gyro_rate[3];      // GYROSCOPE RATE BUFFER
 	float  stick_rate[3];     // CONTROL RATE BUFFER
 
-	int16_t temp;			  // GYRO CONVERSION TEMPVAR
+	int16_t temp_i;			  // GYRO CONVERSION TEMPVAR
 
 } QUAD;
 
 /* INITIALIZE QUAD ROTOR STRUCT */
 void QUAD_Init(QUAD *quad);
+
+/* CLEAR STATE FUNCTION */
+void QUAD_Clear(QUAD *quad);
 
 /* UPDATE PROCEDURE */
 void QUAD_UPDATE(QUAD *quad, volatile uint16_t *IC);

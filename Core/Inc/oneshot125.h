@@ -50,6 +50,7 @@ typedef struct {
 
 	int CCR_MAX;    // CCR VALUE CORRESPONDING TO 100% POWER
 	int CCR_MIN;    // CCR VALUE CORRESPONDING TO 0% POWER
+	int CCR_MIN_ON; // CCR VALUE CORRESPONDING TO MINIMUM ON POWER {TODO}
 	int CCR_STEPS;  // NUMBER OF STEPS
 
 } ONESHOT125;
@@ -70,18 +71,24 @@ OS125_StatusTypeDef OS125_Init(ONESHOT125 *OS);
  * ONESHOT125 OUTPUT UPDATE FUNCTION
  * Converts PID controller output to PWM motor commands
  */
-OS125_StatusTypeDef CommandFromSetpoint(ONESHOT125 *OS);
+OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS);
 
 /*
  * ONESHOT125 SET OUTPUT DIRECT FUNCTION
  * Updates timer CCR registers according to internal CCR array
  */
-OS125_StatusTypeDef UpdateCCR(ONESHOT125 *OS);
+OS125_StatusTypeDef OS125_UpdateCCR(ONESHOT125 *OS);
 
 /*
  * ONESHOT125 SET OUTPUT DIRECT FUNCTION
  * Sets all 4 CCR registers according to setpoint
  */
-OS125_StatusTypeDef SetCCR(ONESHOT125 *OS, int setpoint);
+OS125_StatusTypeDef OS125_SetCCR(ONESHOT125 *OS, int setpoint);
+
+/*
+ * ONESHOT125 ALL OUTPUTS OFF FUNCTION
+ * ENSURES THAT ALL MOTORS ARE OFF
+ */
+OS125_StatusTypeDef OS125_Disarm(ONESHOT125 *OS);
 
 #endif /* INC_ONESHOT125_H_ */
