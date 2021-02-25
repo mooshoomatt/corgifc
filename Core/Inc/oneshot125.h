@@ -20,9 +20,11 @@ extern "C" {
 
 #include "main.h"
 #include "stdint.h"
+#include <math.h>
 
 #define OS125_OK    0x00
 #define OS125_ERROR 0x01
+#define MIN_ON_MULTIPLIER 0.1
 
 typedef uint8_t OS125_StatusTypeDef;
 
@@ -38,8 +40,10 @@ typedef struct {
 	TIM_HandleTypeDef *htim; // TIMER HANDLE
 	TIM_TypeDef       *TIM;  // TIMER INSTANCE
 
-	float *command;          // COMMAND FLOAT ARRAY
-	int   CCR[4];            // MOTOR OUTPUT ARRAY
+	float *com;            // COMMAND FLOAT ARRAY
+	uint16_t *IC;          // INPUT CAPTURE ARRAY
+	float throttle;        // Throttle value
+	int   CCR[4];          // MOTOR OUTPUT ARRAY
 
 	/* TIMER INFORMATION */
 	int   fclk;     // TIMER SOURCE CLOCK FREQUENCY
@@ -50,7 +54,7 @@ typedef struct {
 
 	int CCR_MAX;    // CCR VALUE CORRESPONDING TO 100% POWER
 	int CCR_MIN;    // CCR VALUE CORRESPONDING TO 0% POWER
-	int CCR_MIN_ON; // CCR VALUE CORRESPONDING TO MINIMUM ON POWER {TODO}
+	int CCR_MIN_ON; // CCR VALUE CORRESPONDING TO MINIMUM ON POWER
 	int CCR_STEPS;  // NUMBER OF STEPS
 
 } ONESHOT125;

@@ -6,7 +6,6 @@
  */
 
 #include "oneshot125.h"
-#include <math.h>
 
 /*
  * ONESHOT125 OUTPUT INITIALIZATION FUNCTION
@@ -28,6 +27,8 @@ OS125_StatusTypeDef OS125_Init(ONESHOT125 *OS)
 	OS->CCR_MAX = (int)ceil(0.000250 / OS->dt);
 	// CALCULATE MINIMUM CCR VALUE (0% Power)
 	OS->CCR_MIN = (int)floor(0.000125 / OS->dt);
+	// MINIMUM IDLE CCR VALUE
+	OS->CCR_MIN_ON = (int)OS->CCR_MIN*(1.0 + MIN_ON_MULTIPLIER);
 	// CALCULATE NUMBER OF CCR STEPS
 	OS->CCR_STEPS = OS->CCR_MAX - OS->CCR_MIN;
 
@@ -47,13 +48,18 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
 	// {TODO}: TAKE IN INPUT CAPTURE DATA AND PID OUTPUT AND
 	//         CONVERT TO CCR VALUES (PWM OUTPUTS)
 
-	// READ THROTTLE VALUE
+	// READ THROTTLE VALUE (MIN_ON - 1 scale)
+	OS->throttle = fmin(1.0, fmax(MIN_ON_MULTIPLIER, ((float)OS->IC[0]-1000.0)/1000.0));
 
-	// ADJUST ACCORDING TO ROLL PID OUTPUT
-
-	// ADJUST ACCORDING TO PITCH PID OUTPUT
-
-	// ADJUST ACCORDING TO YAW PID OUTPUT
+	// CALCULATE MOTOR SPEEDS AND CONVERT TO CCR
+	// MOTOR 1 (TOP RIGHT)
+	OS->CCR[0] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] - OS->com[1] - OS->com[2])));
+	// MOTOR 2 (TOP LEFT)
+	OS->CCR[1] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] - OS->com[1] + OS->com[2])));
+	// MOTOR 3 (BOTTOM LEFT)
+	OS->CCR[2] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] + OS->com[1] - OS->com[2])));
+	// MOTOR 4 (BOTTOM RIGHT)
+	OS->CCR[3] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] + OS->com[1] + OS->com[2])));
 
 	return OS125_OK;
 }

@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 #include "stdint.h"
+#include <math.h>
 
 #define PID_OK    0x00
 #define PID_ERROR 0x01

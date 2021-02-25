@@ -672,7 +672,8 @@ static void BMI088_Wrapper_Init(void)
 static void OS125_Wrapper_Init(void)
 {
 	OSHOT.htim     = &htim2;
-	OSHOT.command  = PID.out;
+	OSHOT.com      = PID.out;
+	OSHOT.IC       = IC_Elapsed;
 	OSHOT.fclk     = 72000000;
 	OSHOT.fclk_psc = 1 - 1;
 

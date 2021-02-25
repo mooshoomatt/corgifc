@@ -99,8 +99,8 @@ PID_StatusTypeDef PID3_Update(PID3 *pid, float *set, float *rot, float T)
 
 		// CALCULATE INTEGRAL TERM AND CLAMP
 		pid->integral[i] += 0.5*(pid->Ki[i])*T*(pid->error[i] + pid->prevError[i]);
-		pid->integral[i] = (pid->integral[i] > pid->intLimMax) ? pid->intLimMax : pid->integral[i];
-		pid->integral[i] = (pid->integral[i] < pid->intLimMin) ? pid->intLimMin : pid->integral[i];
+		pid->integral[i] = fmax(pid->integral[i], pid->intLimMin);
+	    pid->integral[i] = fmin(pid->integral[i], pid->intLimMax);
 
 		// CALCULATE DERIVATIVE TERM (ON MEASUREMENT)
 		if (T == 0) { return PID_ERROR; }
@@ -108,8 +108,12 @@ PID_StatusTypeDef PID3_Update(PID3 *pid, float *set, float *rot, float T)
 
 		// CALCULATE OUTPUT AND CLAMP
 		pid->out[i] = pid->proportional[i] + pid->integral[i] + pid->derivative[i];
-		pid->out[i] = (pid->out[i] > pid->outLimMax) ? pid->outLimMax : pid->out[i];
-		pid->out[i] = (pid->out[i] < pid->outLimMin) ? pid->outLimMin : pid->out[i];
+		pid->out[i] = fmax(pid->out[i], pid->outLimMin);
+		pid->out[i] = fmin(pid->out[i], pid->outLimMax);
+
+		// OLD CLAMPING METHOD
+		//pid->out[i] = (pid->out[i] > pid->outLimMax) ? pid->outLimMax : pid->out[i];
+		//pid->out[i] = (pid->out[i] < pid->outLimMin) ? pid->outLimMin : pid->out[i];
 
 		// UPDATE TEMPVARS
 		pid->prevError[i] = pid->error[i];
