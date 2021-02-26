@@ -658,6 +658,9 @@ static void QUAD_Wrapper_Init(void)
 	quad.PID  = &PID;
 
 	QUAD_Init(&quad);
+
+	// ENABLE TEST MODE (THROTTLE PASS THROUGH)
+	quad.TEST_MODE = 0x1;
 }
 
 static void BMI088_Wrapper_Init(void)

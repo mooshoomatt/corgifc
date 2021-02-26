@@ -20,6 +20,9 @@ void QUAD_Init(QUAD *quad)
 	// CLEAR SETPOINT
 	quad->set[0] = 0.0; quad->set[1] = 0.0; quad->set[2] = 0.0;
 
+	// SET NORMAL OPERATION MODE
+	quad->TEST_MODE = 0x0;
+
 	// GET FIRST TIME MEASUREMENT
 	quad->tprev = __HAL_TIM_GET_COUNTER(quad->htim);
 }
@@ -68,9 +71,13 @@ void QUAD_UPDATE(QUAD *quad, volatile uint16_t *IC)
 		// ITERATE PID ALGORITHM
 		if (PID3_Update(quad->PID, quad->set, quad->rot, 0.000001*(float)quad->telapsed) != PID_OK) { Error_Handler(); }
 
-		// UPDATE MOTOR SETTINGS
-		if (OS125_CommandFromSetpoint(quad->OS) != OS125_OK) { Error_Handler(); }
-		if (OS125_UpdateCCR(quad->OS) != OS125_OK) { Error_Handler(); }
+		// CHECK IF WE ARE IN TEST MODE
+		if (quad->TEST_MODE == 0x1) { OS125_ThrottlePassThrough(quad->OS); }
+		// OTHERWISE CALCULATE COMMAND FROM PID OUTPUT
+		else						{ OS125_CommandFromSetpoint(quad->OS); }
+
+		// UPDATE THE MOTOR OUTPUTS
+		OS125_UpdateCCR(quad->OS);
 	}
 	// NOT ARMED
 	else
@@ -91,7 +98,7 @@ void QUAD_SEND_ORIENTATION(QUAD *quad)
 {
 	// SEND ORIENTATION DATA OVER VIRTUAL COM PORT
 	// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [OTHER]
-	sprintf(quad->tx_buf, "%f\t%f\t%f\t%f\t%f\t%f\t%i\n", quad->set[0], quad->set[1], quad->set[2], quad->PID->out[0], quad->PID->out[1], quad->PID->out[2], quad->OS->CCR_MIN);
+	sprintf(quad->tx_buf, "%f\t%f\t%f\t%f\t%f\t%f\t%i\n", quad->set[0], quad->set[1], quad->set[2], quad->PID->out[0], quad->PID->out[1], quad->PID->out[2], quad->TEST_MODE);
 	CDC_Transmit_FS((uint8_t*)(quad->tx_buf), strlen(quad->tx_buf));
 
 	// ALSO CHECK IF WE NEED TO UPDATE ARM_STATUS LED

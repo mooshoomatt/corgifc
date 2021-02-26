@@ -43,6 +43,7 @@ typedef struct {
 	float set[3];             // SETPOINT
 
 	uint8_t ARM_STATUS;       // ARM STATUS
+	uint8_t TEST_MODE;        // THROTTLE PASS THROUGH MODE
 
 	uint8_t gyro_buf[6];      // GYROSCOPE BYTE BUFFER
 	char tx_buf[64];          // TX BUFFER

@@ -65,6 +65,21 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
 }
 
 /*
+ * ONESHOT125 THROTTLE PASSTHROUGH FUNCTION
+ * Disregards PID controller and just passes through the throttle input
+ */
+OS125_StatusTypeDef OS125_ThrottlePassThrough(ONESHOT125 *OS)
+{
+	OS->throttle = fmin(1.0, fmax(0.0, ((float)OS->IC[0]-1000.0))/1000.0);
+	for (int i = 0; i < 4; i++)
+	{
+		OS->CCR[i] = OS->CCR_MIN + (int)OS->CCR_STEPS*OS->throttle;
+	}
+
+	return OS125_OK;
+}
+
+/*
  * ONESHOT125 SET OUTPUT DIRECT FUNCTION
  * Updates timer CCR registers according to internal CCR array
  */

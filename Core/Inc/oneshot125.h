@@ -41,7 +41,7 @@ typedef struct {
 	TIM_TypeDef       *TIM;  // TIMER INSTANCE
 
 	float *com;            // COMMAND FLOAT ARRAY
-	uint16_t *IC;          // INPUT CAPTURE ARRAY
+	volatile uint16_t *IC; // INPUT CAPTURE ARRAY
 	float throttle;        // Throttle value
 	int   CCR[4];          // MOTOR OUTPUT ARRAY
 
@@ -76,6 +76,12 @@ OS125_StatusTypeDef OS125_Init(ONESHOT125 *OS);
  * Converts PID controller output to PWM motor commands
  */
 OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS);
+
+/*
+ * ONESHOT125 THROTTLE PASSTHROUGH FUNCTION
+ * Disregards PID controller and just passes through the throttle input
+ */
+OS125_StatusTypeDef OS125_ThrottlePassThrough(ONESHOT125 *OS);
 
 /*
  * ONESHOT125 SET OUTPUT DIRECT FUNCTION
