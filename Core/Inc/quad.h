@@ -27,7 +27,7 @@ extern "C" {
 #define Y_DEFAULT_RATE 5.0 // DEFAULT PITCH RATE (rad/s)
 #define Z_DEFAULT_RATE 3.0 // DEFAULT YAW RATE   (rad/s)
 
-#define ARM_CHANNEL 4
+#define ARM_CHANNEL 4      // ARRAY INDEX FOR ARM SWITCH
 
 typedef struct {
 

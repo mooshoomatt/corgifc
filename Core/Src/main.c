@@ -65,13 +65,13 @@ QUAD quad;
 /* PID CONTROLLER */
 PID3 PID;
 
-/* PID GAINS */
-const float Kp[] = {1.0, 1.0, 1.0};
-const float Ki[] = {0.1, 1.0, 1.0};
-const float Kd[] = {0.0, 0.0, 0.0};
-
 /* ONESHOT125 OUTPUT DRIVER */
 ONESHOT125 OSHOT;
+
+/* PID GAINS */
+const float Kp[] = {0.5, 0.5, 0.5};
+const float Ki[] = {0.1, 0.1, 0.1};
+const float Kd[] = {0.0, 0.0, 0.0};
 
 /* INPUT CAPTURE VARIABLES */
 volatile uint8_t  IC_Started[6] = {0,0,0,0,0,0};
@@ -82,8 +82,6 @@ volatile uint16_t IC_Elapsed[6] = {0,0,0,0,0,0};
 /* GLOBAL FLAGS */
 volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG
 volatile uint8_t UPDATE_STATUS = UPDATE_RESET; // UPDATE READY FLAG
-
-char buf[64];
 
 /* USER CODE END PV */
 
@@ -186,8 +184,6 @@ int main(void)
 	  if (UPDATE_STATUS == UPDATE_READY)
 	  {
 		  QUAD_SEND_ORIENTATION(&quad);
-		  //sprintf(buf, "%i\t%i\t%i\t%i\t%i\t%i\t\n", IC_Elapsed[0], IC_Elapsed[1], IC_Elapsed[2], IC_Elapsed[3], IC_Elapsed[4], IC_Elapsed[5]);
-		  //CDC_Transmit_FS((uint8_t*)(buf), strlen(buf));
 
 		  // RESET UPDATE_READY FLAG
 		  UPDATE_STATUS = UPDATE_RESET;
@@ -686,10 +682,12 @@ static void OS125_Wrapper_Init(void)
 /* PID INITIALIZATION FUNCTION */
 static void PID3_Wrapper_Init(void)
 {
-	if ( PID3_Init(&PID, Kp, Ki, Kd) != PID_OK )                   { Error_Handler(); }
-	if ( PID3_Set_Tau(&PID, 0.02) != PID_OK)                       { Error_Handler(); }
-	if ( PID3_Set_Integrator_Limit(&PID, -100.0, 100.0) != PID_OK) { Error_Handler(); }
-	if ( PID3_Set_Output_Limit(&PID, -100.0, 100.0) != PID_OK)     { Error_Handler(); }
+	if ( PID3_Init(&PID, Kp, Ki, Kd) != PID_OK )               { Error_Handler(); }
+	if ( PID3_Set_Tau(&PID, 0.02) != PID_OK)                   { Error_Handler(); }
+	// SET INTEGRATOR LIMITS TO 10% OF OUTPUT
+	if ( PID3_Set_Integrator_Limit(&PID, -0.1, 0.1) != PID_OK) { Error_Handler(); }
+	// SET PID OUTPUT LIMIT TO 20% OF OUTPUT
+	if ( PID3_Set_Output_Limit(&PID, -0.2, 0.2) != PID_OK)   { Error_Handler(); }
 }
 
 /* START INPUT CAPTURE */

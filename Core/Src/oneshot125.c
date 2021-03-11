@@ -32,7 +32,7 @@ OS125_StatusTypeDef OS125_Init(ONESHOT125 *OS)
 	// CALCULATE NUMBER OF CCR STEPS
 	OS->CCR_STEPS = OS->CCR_MAX - OS->CCR_MIN;
 
-	// SET ALL OUTPUTS TO 0
+	// SET ALL OUTPUTS TO 0%
 	for (int i = 0; i < 4; i++) { OS->CCR[i] = OS->CCR_MIN; }
 	OS125_UpdateCCR(OS);
 
@@ -45,9 +45,6 @@ OS125_StatusTypeDef OS125_Init(ONESHOT125 *OS)
  */
 OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
 {
-	// {TODO}: TAKE IN INPUT CAPTURE DATA AND PID OUTPUT AND
-	//         CONVERT TO CCR VALUES (PWM OUTPUTS)
-
 	// READ THROTTLE VALUE (MIN_ON - 1 scale)
 	OS->throttle = fmin(1.0, fmax(MIN_ON_MULTIPLIER, ((float)OS->IC[0]-1000.0)/1000.0));
 

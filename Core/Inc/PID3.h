@@ -20,10 +20,10 @@ extern "C" {
 #define PID_OK    0x00
 #define PID_ERROR 0x01
 
-#define PID_MAXINT  1000.0;
-#define PID_MININT -1000.0;
-#define PID_MAXOUT  1000.0;
-#define PID_MINOUT -1000.0;
+#define PID_MAXINT  1.0;
+#define PID_MININT -1.0;
+#define PID_MAXOUT  10.0;
+#define PID_MINOUT -10.0;
 
 typedef uint8_t PID_StatusTypeDef;
 
