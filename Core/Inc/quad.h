@@ -33,6 +33,7 @@ typedef struct {
 
 	I2C_HandleTypeDef *hi2c;  // I2C Handle for gyro
 	TIM_HandleTypeDef *htim;  // Timer Handle for time measurement
+	volatile uint16_t *IC;    // Input Capture Handle
 	ONESHOT125 *OS;           // OneShot125 Output Handle
 	PID3 *PID;                // PID Controller Handle
 
@@ -46,7 +47,7 @@ typedef struct {
 	uint8_t TEST_MODE;        // THROTTLE PASS THROUGH MODE
 
 	uint8_t gyro_buf[6];      // GYROSCOPE BYTE BUFFER
-	char tx_buf[64];          // TX BUFFER
+	char tx_buf[256];         // TX BUFFER
 
 	float  gyro_rate[3];      // GYROSCOPE RATE BUFFER
 	float  stick_rate[3];     // CONTROL RATE BUFFER
@@ -62,7 +63,7 @@ void QUAD_Init(QUAD *quad);
 void QUAD_Clear(QUAD *quad);
 
 /* UPDATE PROCEDURE */
-void QUAD_UPDATE(QUAD *quad, volatile uint16_t *IC);
+void QUAD_UPDATE(QUAD *quad);
 
 /* SEND ORIENTATION OVER SERIAL */
 void QUAD_SEND_ORIENTATION(QUAD *quad);

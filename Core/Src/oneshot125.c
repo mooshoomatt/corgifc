@@ -50,13 +50,13 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
 
 	// CALCULATE MOTOR SPEEDS AND CONVERT TO CCR
 	// MOTOR 1 (TOP RIGHT)
-	OS->CCR[0] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] - OS->com[1] - OS->com[2])));
+	OS->CCR[0] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] - OS->com[1] + OS->com[2])));
 	// MOTOR 2 (TOP LEFT)
-	OS->CCR[1] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] - OS->com[1] + OS->com[2])));
+	OS->CCR[1] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] - OS->com[1] - OS->com[2])));
 	// MOTOR 3 (BOTTOM LEFT)
-	OS->CCR[2] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] + OS->com[1] - OS->com[2])));
+	OS->CCR[2] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] + OS->com[1] + OS->com[2])));
 	// MOTOR 4 (BOTTOM RIGHT)
-	OS->CCR[3] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] + OS->com[1] + OS->com[2])));
+	OS->CCR[3] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] + OS->com[1] - OS->com[2])));
 
 	return OS125_OK;
 }

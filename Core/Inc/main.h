@@ -74,6 +74,15 @@ void Error_Handler(void);
 #define UPDATE_READY 0x01
 #define UPDATE_RESET 0x00
 
+typedef struct {
+	/* INPUT CAPTURE VARIABLES */
+	volatile uint8_t  started[6];
+	volatile uint16_t ts1[6];
+	volatile uint16_t ts2[6];
+	volatile uint16_t elapsed[6];
+
+} PWMCAPTURE;
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

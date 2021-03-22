@@ -38,14 +38,14 @@ void QUAD_Clear(QUAD *quad)
 }
 
 /* UPDATE PROCEDURE */
-void QUAD_UPDATE(QUAD *quad, volatile uint16_t *IC)
+void QUAD_UPDATE(QUAD *quad)
 {
 	// UPDATE TIMER
 	quad->telapsed = __HAL_TIM_GET_COUNTER(quad->htim) - quad->tprev;
 	quad->tprev    = quad->tprev + quad->telapsed;
 
 	// CHECK IF ARMED
-	if (IC[ARM_CHANNEL] > 1500)
+	if (quad->IC[ARM_CHANNEL] > 1500)
 	{
 		// SET ARM_STATUS FLAG
 		quad->ARM_STATUS = 0x1;
@@ -64,7 +64,7 @@ void QUAD_UPDATE(QUAD *quad, volatile uint16_t *IC)
 		// UPDATE ROTATION SETPOINT
 		for (int i = 0; i < 3; i++)
 		{
-			quad->stick_rate[i] = quad->RATES[i]*((float)IC[i+1] - 1500.0)/500.0;
+			quad->stick_rate[i] = quad->RATES[i]*((float)quad->IC[i+1] - 1500.0)/500.0;
 			quad->set[i]        = quad->set[i] + 0.000001*(float)quad->telapsed*quad->stick_rate[i];
 		}
 
@@ -98,7 +98,11 @@ void QUAD_SEND_ORIENTATION(QUAD *quad)
 {
 	// SEND ORIENTATION DATA OVER VIRTUAL COM PORT
 	// DATA FORMAT: [X ANGLE]    [Y ANGLE]    [Z ANGLE]    [OTHER]
-	sprintf(quad->tx_buf, "%f\t%f\t%f\t%f\t%f\t%f\t%i\n", quad->set[0], quad->set[1], quad->set[2], quad->PID->out[0], quad->PID->out[1], quad->PID->out[2], quad->TEST_MODE);
+	sprintf(quad->tx_buf, "%f %f %f %f %f %f %f %f %f %lu %lu %lu %lu\n",
+			quad->set[0], quad->set[1], quad->set[2],
+			quad->rot[0], quad->rot[1], quad->rot[2],
+			quad->PID->out[0], quad->PID->out[1], quad->PID->out[2],
+			quad->OS->TIM->CCR1, quad->OS->TIM->CCR2, quad->OS->TIM->CCR3, quad->OS->TIM->CCR4);
 	CDC_Transmit_FS((uint8_t*)(quad->tx_buf), strlen(quad->tx_buf));
 
 	// ALSO CHECK IF WE NEED TO UPDATE ARM_STATUS LED

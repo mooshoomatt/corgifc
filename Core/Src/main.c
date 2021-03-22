@@ -62,6 +62,9 @@ TIM_HandleTypeDef htim7;
 /* QUAD STRUCTURE */
 QUAD quad;
 
+/* PWM INPUT CAPTURE */
+PWMCAPTURE IC;
+
 /* PID CONTROLLER */
 PID3 PID;
 
@@ -69,15 +72,9 @@ PID3 PID;
 ONESHOT125 OSHOT;
 
 /* PID GAINS */
-const float Kp[] = {0.5, 0.5, 0.5};
-const float Ki[] = {0.1, 0.1, 0.1};
-const float Kd[] = {0.0, 0.0, 0.0};
-
-/* INPUT CAPTURE VARIABLES */
-volatile uint8_t  IC_Started[6] = {0,0,0,0,0,0};
-volatile uint16_t IC_ts1[6]     = {0,0,0,0,0,0};
-volatile uint16_t IC_ts2[6]     = {0,0,0,0,0,0};
-volatile uint16_t IC_Elapsed[6] = {0,0,0,0,0,0};
+const float Kp[] = {0.15, 0.15, 0.15};
+const float Ki[] = {0.05, 0.05, 0.05};
+const float Kd[] = {0.07, 0.07, 0.07};
 
 /* GLOBAL FLAGS */
 volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG
@@ -97,6 +94,7 @@ static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void QUAD_Wrapper_Init(void);
+static void IC_Wrapper_Init(void);
 static void BMI088_Wrapper_Init(void);
 static void OS125_Wrapper_Init(void);
 static void PID3_Wrapper_Init(void);
@@ -151,6 +149,7 @@ int main(void)
   HAL_TIM_Base_Start(&htim6);    	// START TIMEKEEPING TIMER
 
   BMI088_Wrapper_Init();			// INITIALIZE GYROSCOPE
+  IC_Wrapper_Init();                // INITALIZE INPUT CAPTURE
   OS125_Wrapper_Init();				// INITIALIZE ONESHOT125 OUTPUT DRIVER
   PID3_Wrapper_Init();				// INITALIZE PID CONTROLLER
   QUAD_Wrapper_Init();				// INITIALIZE QUAD STRUCTURE
@@ -174,7 +173,7 @@ int main(void)
 	  // CHECK IF DATA_READY FLAG IS SET
 	  if (DATA_STATUS == DATA_READY)
 	  {
-		  QUAD_UPDATE(&quad, IC_Elapsed);
+		  QUAD_UPDATE(&quad);
 
 		  // RESET DATA_READY FLAG
 		  DATA_STATUS = DATA_RESET;
@@ -606,15 +605,15 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 		}
 
 		//  PULSE WIDTH CAPTURE
-		if (IC_Started[idx] == 0x0) {
-			IC_ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
+		if (IC.started[idx] == 0x0) {
+			IC.ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
-			IC_Started[idx] = 0x1;															// UPDATE STATUS
-		} else if (IC_Started[idx] == 0x1) {
-			IC_ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
-			IC_Elapsed[idx] = IC_ts2[idx] - IC_ts1[idx];									// CALCULATE PULSE WIDTH
+			IC.started[idx] = 0x1;															// UPDATE STATUS
+		} else if (IC.started[idx] == 0x1) {
+			IC.ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
+			IC.elapsed[idx] = IC.ts2[idx] - IC.ts1[idx];									// CALCULATE PULSE WIDTH
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
-			IC_Started[idx] = 0x0;															// UPDATE STATUS
+			IC.started[idx] = 0x0;															// UPDATE STATUS
 		}
 	}
 	// TIMER 4: 2 CHANNELS
@@ -632,15 +631,15 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 		}
 
 		//  PULSE WIDTH CAPTURE
-		if (IC_Started[idx] == 0x0) {
-			IC_ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
+		if (IC.started[idx] == 0x0) {
+			IC.ts1[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET FIRST TIMESTAMP
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_FALLING);	// FLIP POLARITY
-			IC_Started[idx] = 0x1;															// UPDATE STATUS
-		} else if (IC_Started[idx] == 0x1) {
-			IC_ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
-			IC_Elapsed[idx] = IC_ts2[idx] - IC_ts1[idx];									// CALCULATE PULSE WIDTH
+			IC.started[idx] = 0x1;															// UPDATE STATUS
+		} else if (IC.started[idx] == 0x1) {
+			IC.ts2[idx] = HAL_TIM_ReadCapturedValue(htim, channel);							// GET SECOND TIMESTAMP
+			IC.elapsed[idx] = IC.ts2[idx] - IC.ts1[idx];									// CALCULATE PULSE WIDTH
 			__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_INPUTCHANNELPOLARITY_RISING);	// FLIP POLARITY
-			IC_Started[idx] = 0x0;															// UPDATE STATUS
+			IC.started[idx] = 0x0;															// UPDATE STATUS
 		}
 	}
 
@@ -650,13 +649,25 @@ static void QUAD_Wrapper_Init(void)
 {
 	quad.hi2c = &hi2c1;
 	quad.htim = &htim6;
+	quad.IC   = IC.elapsed;
 	quad.OS   = &OSHOT;
 	quad.PID  = &PID;
 
 	QUAD_Init(&quad);
 
 	// ENABLE TEST MODE (THROTTLE PASS THROUGH)
-	quad.TEST_MODE = 0x1;
+	// quad.TEST_MODE = 0x1;
+}
+
+static void IC_Wrapper_Init(void)
+{
+	for (int i = 0; i < 6; i++)
+	{
+		IC.started[0] = 0;
+		IC.ts1[0] = 0;
+		IC.ts2[0] = 0;
+		IC.elapsed[0] = 0;
+	}
 }
 
 static void BMI088_Wrapper_Init(void)
@@ -672,7 +683,7 @@ static void OS125_Wrapper_Init(void)
 {
 	OSHOT.htim     = &htim2;
 	OSHOT.com      = PID.out;
-	OSHOT.IC       = IC_Elapsed;
+	OSHOT.IC       = IC.elapsed;
 	OSHOT.fclk     = 72000000;
 	OSHOT.fclk_psc = 1 - 1;
 
@@ -683,11 +694,11 @@ static void OS125_Wrapper_Init(void)
 static void PID3_Wrapper_Init(void)
 {
 	if ( PID3_Init(&PID, Kp, Ki, Kd) != PID_OK )               { Error_Handler(); }
-	if ( PID3_Set_Tau(&PID, 0.02) != PID_OK)                   { Error_Handler(); }
+	if ( PID3_Set_Tau(&PID, 0.002) != PID_OK)                  { Error_Handler(); }
 	// SET INTEGRATOR LIMITS TO 10% OF OUTPUT
 	if ( PID3_Set_Integrator_Limit(&PID, -0.1, 0.1) != PID_OK) { Error_Handler(); }
-	// SET PID OUTPUT LIMIT TO 20% OF OUTPUT
-	if ( PID3_Set_Output_Limit(&PID, -0.2, 0.2) != PID_OK)   { Error_Handler(); }
+	// SET PID OUTPUT LIMIT TO 30% OF OUTPUT
+	if ( PID3_Set_Output_Limit(&PID, -0.3, 0.3) != PID_OK)     { Error_Handler(); }
 }
 
 /* START INPUT CAPTURE */
