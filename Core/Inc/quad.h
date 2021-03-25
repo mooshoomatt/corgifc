@@ -23,9 +23,9 @@ extern "C" {
 #define GYRO_RATE 2000.0  // Gyroscope output scale (deg/second)
 #define IC_SCALE  1000.0  // IC Pulse width scale
 
-#define X_DEFAULT_RATE 5.0 // DEFAULT ROLL RATE  (rad/s)
-#define Y_DEFAULT_RATE 5.0 // DEFAULT PITCH RATE (rad/s)
-#define Z_DEFAULT_RATE 3.0 // DEFAULT YAW RATE   (rad/s)
+#define X_DEFAULT_RATE 5.0  // DEFAULT ROLL RATE  (rad/s)
+#define Y_DEFAULT_RATE 5.0  // DEFAULT PITCH RATE (rad/s)
+#define Z_DEFAULT_RATE -3.0 // DEFAULT YAW RATE   (rad/s)
 
 #define ARM_CHANNEL 4      // ARRAY INDEX FOR ARM SWITCH
 

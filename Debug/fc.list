@@ -39,9 +39,9 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING
  17 .debug_line   0001333f  00000000  00000000  00067ca8  2**0
                   CONTENTS, READONLY, DEBUGGING
- 18 .debug_str    000c40e0  00000000  00000000  0007afe7  2**0
+ 18 .debug_str    000c40e2  00000000  00000000  0007afe7  2**0
                   CONTENTS, READONLY, DEBUGGING
- 19 .comment      0000007b  00000000  00000000  0013f0c7  2**0
+ 19 .comment      0000007b  00000000  00000000  0013f0c9  2**0
                   CONTENTS, READONLY
  20 .debug_frame  0000619c  00000000  00000000  0013f144  2**2
                   CONTENTS, READONLY, DEBUGGING
@@ -4671,7 +4671,7 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
 
 	// CALCULATE MOTOR SPEEDS AND CONVERT TO CCR
 	// MOTOR 1 (TOP RIGHT)
-	OS->CCR[0] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] - OS->com[1] + OS->com[2])));
+	OS->CCR[0] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] - OS->com[1] - OS->com[2])));
  80026a8:	687b      	ldr	r3, [r7, #4]
  80026aa:	6b5b      	ldr	r3, [r3, #52]	; 0x34
  80026ac:	4618      	mov	r0, r3
@@ -4707,7 +4707,7 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
  80026fe:	689b      	ldr	r3, [r3, #8]
  8002700:	3308      	adds	r3, #8
  8002702:	edd3 7a00 	vldr	s15, [r3]
- 8002706:	ee76 7a27 	vadd.f32	s15, s12, s15
+ 8002706:	ee76 7a67 	vsub.f32	s15, s12, s15
  800270a:	ee66 7aa7 	vmul.f32	s15, s13, s15
  800270e:	ee77 7a27 	vadd.f32	s15, s14, s15
  8002712:	ee17 0a90 	vmov	r0, s15
@@ -4731,7 +4731,7 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
  8002750:	687b      	ldr	r3, [r7, #4]
  8002752:	615a      	str	r2, [r3, #20]
 	// MOTOR 2 (TOP LEFT)
-	OS->CCR[1] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] - OS->com[1] - OS->com[2])));
+	OS->CCR[1] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] - OS->com[1] + OS->com[2])));
  8002754:	687b      	ldr	r3, [r7, #4]
  8002756:	6b5b      	ldr	r3, [r3, #52]	; 0x34
  8002758:	4618      	mov	r0, r3
@@ -4767,7 +4767,7 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
  80027aa:	689b      	ldr	r3, [r3, #8]
  80027ac:	3308      	adds	r3, #8
  80027ae:	edd3 7a00 	vldr	s15, [r3]
- 80027b2:	ee76 7a67 	vsub.f32	s15, s12, s15
+ 80027b2:	ee76 7a27 	vadd.f32	s15, s12, s15
  80027b6:	ee66 7aa7 	vmul.f32	s15, s13, s15
  80027ba:	ee77 7a27 	vadd.f32	s15, s14, s15
  80027be:	ee17 0a90 	vmov	r0, s15
@@ -4791,7 +4791,7 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
  80027fc:	687b      	ldr	r3, [r7, #4]
  80027fe:	619a      	str	r2, [r3, #24]
 	// MOTOR 3 (BOTTOM LEFT)
-	OS->CCR[2] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] + OS->com[1] + OS->com[2])));
+	OS->CCR[2] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle + OS->com[0] + OS->com[1] - OS->com[2])));
  8002800:	687b      	ldr	r3, [r7, #4]
  8002802:	6b5b      	ldr	r3, [r3, #52]	; 0x34
  8002804:	4618      	mov	r0, r3
@@ -4827,7 +4827,7 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
  8002856:	689b      	ldr	r3, [r3, #8]
  8002858:	3308      	adds	r3, #8
  800285a:	edd3 7a00 	vldr	s15, [r3]
- 800285e:	ee76 7a27 	vadd.f32	s15, s12, s15
+ 800285e:	ee76 7a67 	vsub.f32	s15, s12, s15
  8002862:	ee66 7aa7 	vmul.f32	s15, s13, s15
  8002866:	ee77 7a27 	vadd.f32	s15, s14, s15
  800286a:	ee17 0a90 	vmov	r0, s15
@@ -4851,7 +4851,7 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
  80028a8:	687b      	ldr	r3, [r7, #4]
  80028aa:	61da      	str	r2, [r3, #28]
 	// MOTOR 4 (BOTTOM RIGHT)
-	OS->CCR[3] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] + OS->com[1] - OS->com[2])));
+	OS->CCR[3] = fmin(OS->CCR_MAX, fmax(OS->CCR_MIN_ON, OS->CCR_MIN + (int)OS->CCR_STEPS*(OS->throttle - OS->com[0] + OS->com[1] + OS->com[2])));
  80028ac:	687b      	ldr	r3, [r7, #4]
  80028ae:	6b5b      	ldr	r3, [r3, #52]	; 0x34
  80028b0:	4618      	mov	r0, r3
@@ -4887,7 +4887,7 @@ OS125_StatusTypeDef OS125_CommandFromSetpoint(ONESHOT125 *OS)
  8002902:	689b      	ldr	r3, [r3, #8]
  8002904:	3308      	adds	r3, #8
  8002906:	edd3 7a00 	vldr	s15, [r3]
- 800290a:	ee76 7a67 	vsub.f32	s15, s12, s15
+ 800290a:	ee76 7a27 	vadd.f32	s15, s12, s15
  800290e:	ee66 7aa7 	vmul.f32	s15, s13, s15
  8002912:	ee77 7a27 	vadd.f32	s15, s14, s15
  8002916:	ee17 0a90 	vmov	r0, s15
@@ -5179,7 +5179,7 @@ void QUAD_Init(QUAD *quad)
  8002b46:	f85d 7b04 	ldr.w	r7, [sp], #4
  8002b4a:	4770      	bx	lr
  8002b4c:	40a00000 	.word	0x40a00000
- 8002b50:	40400000 	.word	0x40400000
+ 8002b50:	c0400000 	.word	0xc0400000
 
 08002b54 <QUAD_Clear>:
 

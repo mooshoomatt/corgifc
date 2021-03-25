@@ -72,9 +72,10 @@ PID3 PID;
 ONESHOT125 OSHOT;
 
 /* PID GAINS */
-const float Kp[] = {0.15, 0.15, 0.15};
+/* ROLL  PITCH  YAW  */
+const float Kp[] = {0.15, 0.15, 0.20};
 const float Ki[] = {0.05, 0.05, 0.05};
-const float Kd[] = {0.07, 0.07, 0.07};
+const float Kd[] = {0.07, 0.07, 0.02};
 
 /* GLOBAL FLAGS */
 volatile uint8_t DATA_STATUS   = DATA_RESET;   // DATA READY FLAG

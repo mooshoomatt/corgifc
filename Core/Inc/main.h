@@ -68,7 +68,7 @@ void Error_Handler(void);
 /* CONTROL STICK RATE SETTINGS */
 #define XRATE 5.0
 #define YRATE 5.0
-#define ZRATE 3.0
+#define ZRATE -3.0
 
 /* UPDATE FLAG DEFINITIONS */
 #define UPDATE_READY 0x01
