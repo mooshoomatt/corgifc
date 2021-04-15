@@ -36,7 +36,6 @@ typedef uint8_t OS125_StatusTypeDef;
  */
 typedef struct {
 
-
 	TIM_HandleTypeDef *htim; // TIMER HANDLE
 	TIM_TypeDef       *TIM;  // TIMER INSTANCE
 

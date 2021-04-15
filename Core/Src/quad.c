@@ -45,7 +45,7 @@ void QUAD_UPDATE(QUAD *quad)
 	quad->tprev    = quad->tprev + quad->telapsed;
 
 	// CHECK IF ARMED
-	if (quad->IC[ARM_CHANNEL] > 1500)
+	if (quad->IC->elapsed[ARM_CHANNEL] > 1500)
 	{
 		// SET ARM_STATUS FLAG
 		quad->ARM_STATUS = 0x1;
@@ -64,7 +64,7 @@ void QUAD_UPDATE(QUAD *quad)
 		// UPDATE ROTATION SETPOINT
 		for (int i = 0; i < 3; i++)
 		{
-			quad->stick_rate[i] = quad->RATES[i]*((float)quad->IC[i+1] - 1500.0)/500.0;
+			quad->stick_rate[i] = quad->RATES[i]*((float)quad->IC->elapsed[i+1] - 1500.0)/500.0;
 			quad->set[i]        = quad->set[i] + 0.000001*(float)quad->telapsed*quad->stick_rate[i];
 		}
 

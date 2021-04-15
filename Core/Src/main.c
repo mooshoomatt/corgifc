@@ -650,7 +650,7 @@ static void QUAD_Wrapper_Init(void)
 {
 	quad.hi2c = &hi2c1;
 	quad.htim = &htim6;
-	quad.IC   = IC.elapsed;
+	quad.IC   = &IC;
 	quad.OS   = &OSHOT;
 	quad.PID  = &PID;
 

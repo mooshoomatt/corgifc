@@ -27,23 +27,23 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   ALLOC
  11 .ARM.attributes 00000030  00000000  00000000  00020358  2**0
                   CONTENTS, READONLY
- 12 .debug_info   0001dd63  00000000  00000000  00020388  2**0
+ 12 .debug_info   0001dde2  00000000  00000000  00020388  2**0
                   CONTENTS, READONLY, DEBUGGING
- 13 .debug_abbrev 00003b7d  00000000  00000000  0003e0eb  2**0
+ 13 .debug_abbrev 00003b7d  00000000  00000000  0003e16a  2**0
                   CONTENTS, READONLY, DEBUGGING
- 14 .debug_aranges 000014b8  00000000  00000000  00041c68  2**3
+ 14 .debug_aranges 000014b8  00000000  00000000  00041ce8  2**3
                   CONTENTS, READONLY, DEBUGGING
- 15 .debug_ranges 00001328  00000000  00000000  00043120  2**3
+ 15 .debug_ranges 00001328  00000000  00000000  000431a0  2**3
                   CONTENTS, READONLY, DEBUGGING
- 16 .debug_macro  00023860  00000000  00000000  00044448  2**0
+ 16 .debug_macro  0002383c  00000000  00000000  000444c8  2**0
                   CONTENTS, READONLY, DEBUGGING
- 17 .debug_line   0001333f  00000000  00000000  00067ca8  2**0
+ 17 .debug_line   0001333f  00000000  00000000  00067d04  2**0
                   CONTENTS, READONLY, DEBUGGING
- 18 .debug_str    000c40e2  00000000  00000000  0007afe7  2**0
+ 18 .debug_str    000c40be  00000000  00000000  0007b043  2**0
                   CONTENTS, READONLY, DEBUGGING
- 19 .comment      0000007b  00000000  00000000  0013f0c9  2**0
+ 19 .comment      0000007b  00000000  00000000  0013f101  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  0000619c  00000000  00000000  0013f144  2**2
+ 20 .debug_frame  0000619c  00000000  00000000  0013f17c  2**2
                   CONTENTS, READONLY, DEBUGGING
 
 Disassembly of section .text:
@@ -4128,7 +4128,7 @@ static void QUAD_Wrapper_Init(void)
  800229a:	4b08      	ldr	r3, [pc, #32]	; (80022bc <QUAD_Wrapper_Init+0x2c>)
  800229c:	4a09      	ldr	r2, [pc, #36]	; (80022c4 <QUAD_Wrapper_Init+0x34>)
  800229e:	605a      	str	r2, [r3, #4]
-	quad.IC   = IC.elapsed;
+	quad.IC   = &IC;
  80022a0:	4b06      	ldr	r3, [pc, #24]	; (80022bc <QUAD_Wrapper_Init+0x2c>)
  80022a2:	4a09      	ldr	r2, [pc, #36]	; (80022c8 <QUAD_Wrapper_Init+0x38>)
  80022a4:	609a      	str	r2, [r3, #8]
@@ -4153,7 +4153,7 @@ static void QUAD_Wrapper_Init(void)
  80022bc:	20000598 	.word	0x20000598
  80022c0:	2000040c 	.word	0x2000040c
  80022c4:	20000558 	.word	0x20000558
- 80022c8:	2000054a 	.word	0x2000054a
+ 80022c8:	2000052c 	.word	0x2000052c
  80022cc:	20000388 	.word	0x20000388
  80022d0:	20000460 	.word	0x20000460
 
@@ -5253,188 +5253,188 @@ void QUAD_UPDATE(QUAD *quad)
  8002bc6:	829a      	strh	r2, [r3, #20]
 
 	// CHECK IF ARMED
-	if (quad->IC[ARM_CHANNEL] > 1500)
+	if (quad->IC->elapsed[ARM_CHANNEL] > 1500)
  8002bc8:	687b      	ldr	r3, [r7, #4]
  8002bca:	689b      	ldr	r3, [r3, #8]
- 8002bcc:	3308      	adds	r3, #8
- 8002bce:	881b      	ldrh	r3, [r3, #0]
- 8002bd0:	b29b      	uxth	r3, r3
- 8002bd2:	f240 52dc 	movw	r2, #1500	; 0x5dc
- 8002bd6:	4293      	cmp	r3, r2
- 8002bd8:	f240 8169 	bls.w	8002eae <QUAD_UPDATE+0x316>
+ 8002bcc:	8cdb      	ldrh	r3, [r3, #38]	; 0x26
+ 8002bce:	b29b      	uxth	r3, r3
+ 8002bd0:	f240 52dc 	movw	r2, #1500	; 0x5dc
+ 8002bd4:	4293      	cmp	r3, r2
+ 8002bd6:	f240 816a 	bls.w	8002eae <QUAD_UPDATE+0x316>
 	{
 		// SET ARM_STATUS FLAG
 		quad->ARM_STATUS = 0x1;
- 8002bdc:	687b      	ldr	r3, [r7, #4]
- 8002bde:	2201      	movs	r2, #1
- 8002be0:	f883 203c 	strb.w	r2, [r3, #60]	; 0x3c
+ 8002bda:	687b      	ldr	r3, [r7, #4]
+ 8002bdc:	2201      	movs	r2, #1
+ 8002bde:	f883 203c 	strb.w	r2, [r3, #60]	; 0x3c
 
 		// READ GYROSCOPE
 		if ( BMI088_I2C_Read_Gyro(quad->hi2c, quad->gyro_buf) != HAL_OK ) { Error_Handler(); }
- 8002be4:	687b      	ldr	r3, [r7, #4]
- 8002be6:	681a      	ldr	r2, [r3, #0]
- 8002be8:	687b      	ldr	r3, [r7, #4]
- 8002bea:	333e      	adds	r3, #62	; 0x3e
- 8002bec:	4619      	mov	r1, r3
- 8002bee:	4610      	mov	r0, r2
- 8002bf0:	f7fe fa55 	bl	800109e <BMI088_I2C_Read_Gyro>
- 8002bf4:	4603      	mov	r3, r0
- 8002bf6:	2b00      	cmp	r3, #0
- 8002bf8:	d001      	beq.n	8002bfe <QUAD_UPDATE+0x66>
- 8002bfa:	f7ff fc41 	bl	8002480 <Error_Handler>
+ 8002be2:	687b      	ldr	r3, [r7, #4]
+ 8002be4:	681a      	ldr	r2, [r3, #0]
+ 8002be6:	687b      	ldr	r3, [r7, #4]
+ 8002be8:	333e      	adds	r3, #62	; 0x3e
+ 8002bea:	4619      	mov	r1, r3
+ 8002bec:	4610      	mov	r0, r2
+ 8002bee:	f7fe fa56 	bl	800109e <BMI088_I2C_Read_Gyro>
+ 8002bf2:	4603      	mov	r3, r0
+ 8002bf4:	2b00      	cmp	r3, #0
+ 8002bf6:	d001      	beq.n	8002bfc <QUAD_UPDATE+0x64>
+ 8002bf8:	f7ff fc42 	bl	8002480 <Error_Handler>
 
 		// CONVERT TO SIGNED INTEGER, SCALE, AND INTEGRATE
 		for (int i = 0; i < 3; i++)
- 8002bfe:	2300      	movs	r3, #0
- 8002c00:	60fb      	str	r3, [r7, #12]
- 8002c02:	e08a      	b.n	8002d1a <QUAD_UPDATE+0x182>
+ 8002bfc:	2300      	movs	r3, #0
+ 8002bfe:	60fb      	str	r3, [r7, #12]
+ 8002c00:	e08a      	b.n	8002d18 <QUAD_UPDATE+0x180>
 		{
 			quad->temp_i       = quad->gyro_buf[2*i + 1] << 8 | quad->gyro_buf[2*i];
- 8002c04:	68fb      	ldr	r3, [r7, #12]
- 8002c06:	005b      	lsls	r3, r3, #1
- 8002c08:	3301      	adds	r3, #1
- 8002c0a:	687a      	ldr	r2, [r7, #4]
- 8002c0c:	4413      	add	r3, r2
- 8002c0e:	f893 303e 	ldrb.w	r3, [r3, #62]	; 0x3e
- 8002c12:	021b      	lsls	r3, r3, #8
- 8002c14:	b21a      	sxth	r2, r3
- 8002c16:	68fb      	ldr	r3, [r7, #12]
- 8002c18:	005b      	lsls	r3, r3, #1
- 8002c1a:	6879      	ldr	r1, [r7, #4]
- 8002c1c:	440b      	add	r3, r1
- 8002c1e:	f893 303e 	ldrb.w	r3, [r3, #62]	; 0x3e
- 8002c22:	b21b      	sxth	r3, r3
- 8002c24:	4313      	orrs	r3, r2
- 8002c26:	b21a      	sxth	r2, r3
- 8002c28:	687b      	ldr	r3, [r7, #4]
- 8002c2a:	f8a3 215c 	strh.w	r2, [r3, #348]	; 0x15c
+ 8002c02:	68fb      	ldr	r3, [r7, #12]
+ 8002c04:	005b      	lsls	r3, r3, #1
+ 8002c06:	3301      	adds	r3, #1
+ 8002c08:	687a      	ldr	r2, [r7, #4]
+ 8002c0a:	4413      	add	r3, r2
+ 8002c0c:	f893 303e 	ldrb.w	r3, [r3, #62]	; 0x3e
+ 8002c10:	021b      	lsls	r3, r3, #8
+ 8002c12:	b21a      	sxth	r2, r3
+ 8002c14:	68fb      	ldr	r3, [r7, #12]
+ 8002c16:	005b      	lsls	r3, r3, #1
+ 8002c18:	6879      	ldr	r1, [r7, #4]
+ 8002c1a:	440b      	add	r3, r1
+ 8002c1c:	f893 303e 	ldrb.w	r3, [r3, #62]	; 0x3e
+ 8002c20:	b21b      	sxth	r3, r3
+ 8002c22:	4313      	orrs	r3, r2
+ 8002c24:	b21a      	sxth	r2, r3
+ 8002c26:	687b      	ldr	r3, [r7, #4]
+ 8002c28:	f8a3 215c 	strh.w	r2, [r3, #348]	; 0x15c
 			quad->gyro_rate[i] = ((float)quad->temp_i*GYRO_RATE*M_PI)/(32767.0*180.0);
- 8002c2e:	687b      	ldr	r3, [r7, #4]
- 8002c30:	f9b3 315c 	ldrsh.w	r3, [r3, #348]	; 0x15c
- 8002c34:	ee07 3a90 	vmov	s15, r3
- 8002c38:	eef8 7ae7 	vcvt.f32.s32	s15, s15
- 8002c3c:	ee17 0a90 	vmov	r0, s15
- 8002c40:	f7fd fc82 	bl	8000548 <__aeabi_f2d>
- 8002c44:	f04f 0200 	mov.w	r2, #0
- 8002c48:	4bad      	ldr	r3, [pc, #692]	; (8002f00 <QUAD_UPDATE+0x368>)
- 8002c4a:	f7fd fcd5 	bl	80005f8 <__aeabi_dmul>
- 8002c4e:	4603      	mov	r3, r0
- 8002c50:	460c      	mov	r4, r1
- 8002c52:	4618      	mov	r0, r3
- 8002c54:	4621      	mov	r1, r4
- 8002c56:	a3a2      	add	r3, pc, #648	; (adr r3, 8002ee0 <QUAD_UPDATE+0x348>)
- 8002c58:	e9d3 2300 	ldrd	r2, r3, [r3]
- 8002c5c:	f7fd fccc 	bl	80005f8 <__aeabi_dmul>
- 8002c60:	4603      	mov	r3, r0
- 8002c62:	460c      	mov	r4, r1
- 8002c64:	4618      	mov	r0, r3
- 8002c66:	4621      	mov	r1, r4
- 8002c68:	a39f      	add	r3, pc, #636	; (adr r3, 8002ee8 <QUAD_UPDATE+0x350>)
- 8002c6a:	e9d3 2300 	ldrd	r2, r3, [r3]
- 8002c6e:	f7fd fded 	bl	800084c <__aeabi_ddiv>
- 8002c72:	4603      	mov	r3, r0
- 8002c74:	460c      	mov	r4, r1
- 8002c76:	4618      	mov	r0, r3
- 8002c78:	4621      	mov	r1, r4
- 8002c7a:	f7fd ff95 	bl	8000ba8 <__aeabi_d2f>
- 8002c7e:	4601      	mov	r1, r0
- 8002c80:	687a      	ldr	r2, [r7, #4]
- 8002c82:	68fb      	ldr	r3, [r7, #12]
- 8002c84:	3350      	adds	r3, #80	; 0x50
- 8002c86:	009b      	lsls	r3, r3, #2
- 8002c88:	4413      	add	r3, r2
- 8002c8a:	3304      	adds	r3, #4
- 8002c8c:	6019      	str	r1, [r3, #0]
+ 8002c2c:	687b      	ldr	r3, [r7, #4]
+ 8002c2e:	f9b3 315c 	ldrsh.w	r3, [r3, #348]	; 0x15c
+ 8002c32:	ee07 3a90 	vmov	s15, r3
+ 8002c36:	eef8 7ae7 	vcvt.f32.s32	s15, s15
+ 8002c3a:	ee17 0a90 	vmov	r0, s15
+ 8002c3e:	f7fd fc83 	bl	8000548 <__aeabi_f2d>
+ 8002c42:	f04f 0200 	mov.w	r2, #0
+ 8002c46:	4bae      	ldr	r3, [pc, #696]	; (8002f00 <QUAD_UPDATE+0x368>)
+ 8002c48:	f7fd fcd6 	bl	80005f8 <__aeabi_dmul>
+ 8002c4c:	4603      	mov	r3, r0
+ 8002c4e:	460c      	mov	r4, r1
+ 8002c50:	4618      	mov	r0, r3
+ 8002c52:	4621      	mov	r1, r4
+ 8002c54:	a3a2      	add	r3, pc, #648	; (adr r3, 8002ee0 <QUAD_UPDATE+0x348>)
+ 8002c56:	e9d3 2300 	ldrd	r2, r3, [r3]
+ 8002c5a:	f7fd fccd 	bl	80005f8 <__aeabi_dmul>
+ 8002c5e:	4603      	mov	r3, r0
+ 8002c60:	460c      	mov	r4, r1
+ 8002c62:	4618      	mov	r0, r3
+ 8002c64:	4621      	mov	r1, r4
+ 8002c66:	a3a0      	add	r3, pc, #640	; (adr r3, 8002ee8 <QUAD_UPDATE+0x350>)
+ 8002c68:	e9d3 2300 	ldrd	r2, r3, [r3]
+ 8002c6c:	f7fd fdee 	bl	800084c <__aeabi_ddiv>
+ 8002c70:	4603      	mov	r3, r0
+ 8002c72:	460c      	mov	r4, r1
+ 8002c74:	4618      	mov	r0, r3
+ 8002c76:	4621      	mov	r1, r4
+ 8002c78:	f7fd ff96 	bl	8000ba8 <__aeabi_d2f>
+ 8002c7c:	4601      	mov	r1, r0
+ 8002c7e:	687a      	ldr	r2, [r7, #4]
+ 8002c80:	68fb      	ldr	r3, [r7, #12]
+ 8002c82:	3350      	adds	r3, #80	; 0x50
+ 8002c84:	009b      	lsls	r3, r3, #2
+ 8002c86:	4413      	add	r3, r2
+ 8002c88:	3304      	adds	r3, #4
+ 8002c8a:	6019      	str	r1, [r3, #0]
 			quad->rot[i]       = quad->rot[i] + 0.000001*(float)quad->telapsed*quad->gyro_rate[i];
- 8002c8e:	687a      	ldr	r2, [r7, #4]
- 8002c90:	68fb      	ldr	r3, [r7, #12]
- 8002c92:	3308      	adds	r3, #8
- 8002c94:	009b      	lsls	r3, r3, #2
- 8002c96:	4413      	add	r3, r2
- 8002c98:	3304      	adds	r3, #4
- 8002c9a:	681b      	ldr	r3, [r3, #0]
- 8002c9c:	4618      	mov	r0, r3
- 8002c9e:	f7fd fc53 	bl	8000548 <__aeabi_f2d>
- 8002ca2:	4604      	mov	r4, r0
- 8002ca4:	460d      	mov	r5, r1
- 8002ca6:	687b      	ldr	r3, [r7, #4]
- 8002ca8:	8adb      	ldrh	r3, [r3, #22]
- 8002caa:	ee07 3a90 	vmov	s15, r3
- 8002cae:	eef8 7a67 	vcvt.f32.u32	s15, s15
- 8002cb2:	ee17 0a90 	vmov	r0, s15
- 8002cb6:	f7fd fc47 	bl	8000548 <__aeabi_f2d>
- 8002cba:	a38d      	add	r3, pc, #564	; (adr r3, 8002ef0 <QUAD_UPDATE+0x358>)
- 8002cbc:	e9d3 2300 	ldrd	r2, r3, [r3]
- 8002cc0:	f7fd fc9a 	bl	80005f8 <__aeabi_dmul>
- 8002cc4:	4602      	mov	r2, r0
- 8002cc6:	460b      	mov	r3, r1
- 8002cc8:	4690      	mov	r8, r2
- 8002cca:	4699      	mov	r9, r3
- 8002ccc:	687a      	ldr	r2, [r7, #4]
- 8002cce:	68fb      	ldr	r3, [r7, #12]
- 8002cd0:	3350      	adds	r3, #80	; 0x50
- 8002cd2:	009b      	lsls	r3, r3, #2
- 8002cd4:	4413      	add	r3, r2
- 8002cd6:	3304      	adds	r3, #4
- 8002cd8:	681b      	ldr	r3, [r3, #0]
- 8002cda:	4618      	mov	r0, r3
- 8002cdc:	f7fd fc34 	bl	8000548 <__aeabi_f2d>
- 8002ce0:	4602      	mov	r2, r0
- 8002ce2:	460b      	mov	r3, r1
- 8002ce4:	4640      	mov	r0, r8
- 8002ce6:	4649      	mov	r1, r9
- 8002ce8:	f7fd fc86 	bl	80005f8 <__aeabi_dmul>
- 8002cec:	4602      	mov	r2, r0
- 8002cee:	460b      	mov	r3, r1
- 8002cf0:	4620      	mov	r0, r4
- 8002cf2:	4629      	mov	r1, r5
- 8002cf4:	f7fd faca 	bl	800028c <__adddf3>
- 8002cf8:	4603      	mov	r3, r0
- 8002cfa:	460c      	mov	r4, r1
- 8002cfc:	4618      	mov	r0, r3
- 8002cfe:	4621      	mov	r1, r4
- 8002d00:	f7fd ff52 	bl	8000ba8 <__aeabi_d2f>
- 8002d04:	4601      	mov	r1, r0
- 8002d06:	687a      	ldr	r2, [r7, #4]
- 8002d08:	68fb      	ldr	r3, [r7, #12]
- 8002d0a:	3308      	adds	r3, #8
- 8002d0c:	009b      	lsls	r3, r3, #2
- 8002d0e:	4413      	add	r3, r2
- 8002d10:	3304      	adds	r3, #4
- 8002d12:	6019      	str	r1, [r3, #0]
+ 8002c8c:	687a      	ldr	r2, [r7, #4]
+ 8002c8e:	68fb      	ldr	r3, [r7, #12]
+ 8002c90:	3308      	adds	r3, #8
+ 8002c92:	009b      	lsls	r3, r3, #2
+ 8002c94:	4413      	add	r3, r2
+ 8002c96:	3304      	adds	r3, #4
+ 8002c98:	681b      	ldr	r3, [r3, #0]
+ 8002c9a:	4618      	mov	r0, r3
+ 8002c9c:	f7fd fc54 	bl	8000548 <__aeabi_f2d>
+ 8002ca0:	4604      	mov	r4, r0
+ 8002ca2:	460d      	mov	r5, r1
+ 8002ca4:	687b      	ldr	r3, [r7, #4]
+ 8002ca6:	8adb      	ldrh	r3, [r3, #22]
+ 8002ca8:	ee07 3a90 	vmov	s15, r3
+ 8002cac:	eef8 7a67 	vcvt.f32.u32	s15, s15
+ 8002cb0:	ee17 0a90 	vmov	r0, s15
+ 8002cb4:	f7fd fc48 	bl	8000548 <__aeabi_f2d>
+ 8002cb8:	a38d      	add	r3, pc, #564	; (adr r3, 8002ef0 <QUAD_UPDATE+0x358>)
+ 8002cba:	e9d3 2300 	ldrd	r2, r3, [r3]
+ 8002cbe:	f7fd fc9b 	bl	80005f8 <__aeabi_dmul>
+ 8002cc2:	4602      	mov	r2, r0
+ 8002cc4:	460b      	mov	r3, r1
+ 8002cc6:	4690      	mov	r8, r2
+ 8002cc8:	4699      	mov	r9, r3
+ 8002cca:	687a      	ldr	r2, [r7, #4]
+ 8002ccc:	68fb      	ldr	r3, [r7, #12]
+ 8002cce:	3350      	adds	r3, #80	; 0x50
+ 8002cd0:	009b      	lsls	r3, r3, #2
+ 8002cd2:	4413      	add	r3, r2
+ 8002cd4:	3304      	adds	r3, #4
+ 8002cd6:	681b      	ldr	r3, [r3, #0]
+ 8002cd8:	4618      	mov	r0, r3
+ 8002cda:	f7fd fc35 	bl	8000548 <__aeabi_f2d>
+ 8002cde:	4602      	mov	r2, r0
+ 8002ce0:	460b      	mov	r3, r1
+ 8002ce2:	4640      	mov	r0, r8
+ 8002ce4:	4649      	mov	r1, r9
+ 8002ce6:	f7fd fc87 	bl	80005f8 <__aeabi_dmul>
+ 8002cea:	4602      	mov	r2, r0
+ 8002cec:	460b      	mov	r3, r1
+ 8002cee:	4620      	mov	r0, r4
+ 8002cf0:	4629      	mov	r1, r5
+ 8002cf2:	f7fd facb 	bl	800028c <__adddf3>
+ 8002cf6:	4603      	mov	r3, r0
+ 8002cf8:	460c      	mov	r4, r1
+ 8002cfa:	4618      	mov	r0, r3
+ 8002cfc:	4621      	mov	r1, r4
+ 8002cfe:	f7fd ff53 	bl	8000ba8 <__aeabi_d2f>
+ 8002d02:	4601      	mov	r1, r0
+ 8002d04:	687a      	ldr	r2, [r7, #4]
+ 8002d06:	68fb      	ldr	r3, [r7, #12]
+ 8002d08:	3308      	adds	r3, #8
+ 8002d0a:	009b      	lsls	r3, r3, #2
+ 8002d0c:	4413      	add	r3, r2
+ 8002d0e:	3304      	adds	r3, #4
+ 8002d10:	6019      	str	r1, [r3, #0]
 		for (int i = 0; i < 3; i++)
- 8002d14:	68fb      	ldr	r3, [r7, #12]
- 8002d16:	3301      	adds	r3, #1
- 8002d18:	60fb      	str	r3, [r7, #12]
- 8002d1a:	68fb      	ldr	r3, [r7, #12]
- 8002d1c:	2b02      	cmp	r3, #2
- 8002d1e:	f77f af71 	ble.w	8002c04 <QUAD_UPDATE+0x6c>
+ 8002d12:	68fb      	ldr	r3, [r7, #12]
+ 8002d14:	3301      	adds	r3, #1
+ 8002d16:	60fb      	str	r3, [r7, #12]
+ 8002d18:	68fb      	ldr	r3, [r7, #12]
+ 8002d1a:	2b02      	cmp	r3, #2
+ 8002d1c:	f77f af71 	ble.w	8002c02 <QUAD_UPDATE+0x6a>
 		}
 
 		// UPDATE ROTATION SETPOINT
 		for (int i = 0; i < 3; i++)
- 8002d22:	2300      	movs	r3, #0
- 8002d24:	60bb      	str	r3, [r7, #8]
- 8002d26:	e07e      	b.n	8002e26 <QUAD_UPDATE+0x28e>
+ 8002d20:	2300      	movs	r3, #0
+ 8002d22:	60bb      	str	r3, [r7, #8]
+ 8002d24:	e07f      	b.n	8002e26 <QUAD_UPDATE+0x28e>
 		{
-			quad->stick_rate[i] = quad->RATES[i]*((float)quad->IC[i+1] - 1500.0)/500.0;
- 8002d28:	687a      	ldr	r2, [r7, #4]
- 8002d2a:	68bb      	ldr	r3, [r7, #8]
- 8002d2c:	3306      	adds	r3, #6
- 8002d2e:	009b      	lsls	r3, r3, #2
- 8002d30:	4413      	add	r3, r2
- 8002d32:	681b      	ldr	r3, [r3, #0]
- 8002d34:	4618      	mov	r0, r3
- 8002d36:	f7fd fc07 	bl	8000548 <__aeabi_f2d>
- 8002d3a:	4604      	mov	r4, r0
- 8002d3c:	460d      	mov	r5, r1
- 8002d3e:	687b      	ldr	r3, [r7, #4]
- 8002d40:	689a      	ldr	r2, [r3, #8]
- 8002d42:	68bb      	ldr	r3, [r7, #8]
- 8002d44:	3301      	adds	r3, #1
+			quad->stick_rate[i] = quad->RATES[i]*((float)quad->IC->elapsed[i+1] - 1500.0)/500.0;
+ 8002d26:	687a      	ldr	r2, [r7, #4]
+ 8002d28:	68bb      	ldr	r3, [r7, #8]
+ 8002d2a:	3306      	adds	r3, #6
+ 8002d2c:	009b      	lsls	r3, r3, #2
+ 8002d2e:	4413      	add	r3, r2
+ 8002d30:	681b      	ldr	r3, [r3, #0]
+ 8002d32:	4618      	mov	r0, r3
+ 8002d34:	f7fd fc08 	bl	8000548 <__aeabi_f2d>
+ 8002d38:	4604      	mov	r4, r0
+ 8002d3a:	460d      	mov	r5, r1
+ 8002d3c:	687b      	ldr	r3, [r7, #4]
+ 8002d3e:	689a      	ldr	r2, [r3, #8]
+ 8002d40:	68bb      	ldr	r3, [r7, #8]
+ 8002d42:	3301      	adds	r3, #1
+ 8002d44:	330c      	adds	r3, #12
  8002d46:	005b      	lsls	r3, r3, #1
  8002d48:	4413      	add	r3, r2
- 8002d4a:	881b      	ldrh	r3, [r3, #0]
+ 8002d4a:	88db      	ldrh	r3, [r3, #6]
  8002d4c:	b29b      	uxth	r3, r3
  8002d4e:	ee07 3a90 	vmov	s15, r3
  8002d52:	eef8 7a67 	vcvt.f32.u32	s15, s15
@@ -5527,7 +5527,7 @@ void QUAD_UPDATE(QUAD *quad)
  8002e24:	60bb      	str	r3, [r7, #8]
  8002e26:	68bb      	ldr	r3, [r7, #8]
  8002e28:	2b02      	cmp	r3, #2
- 8002e2a:	f77f af7d 	ble.w	8002d28 <QUAD_UPDATE+0x190>
+ 8002e2a:	f77f af7c 	ble.w	8002d26 <QUAD_UPDATE+0x18e>
 		}
 
 		// ITERATE PID ALGORITHM

@@ -65,11 +65,6 @@ void Error_Handler(void);
 #define GYRO_INT_EXTI_IRQn EXTI15_10_IRQn
 /* USER CODE BEGIN Private defines */
 
-/* CONTROL STICK RATE SETTINGS */
-#define XRATE 5.0
-#define YRATE 5.0
-#define ZRATE -3.0
-
 /* UPDATE FLAG DEFINITIONS */
 #define UPDATE_READY 0x01
 #define UPDATE_RESET 0x00

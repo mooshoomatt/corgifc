@@ -33,7 +33,7 @@ typedef struct {
 
 	I2C_HandleTypeDef *hi2c;  // I2C Handle for gyro
 	TIM_HandleTypeDef *htim;  // Timer Handle for time measurement
-	volatile uint16_t *IC;    // Input Capture Handle
+	PWMCAPTURE *IC;           // Input Capture Handle
 	ONESHOT125 *OS;           // OneShot125 Output Handle
 	PID3 *PID;                // PID Controller Handle
 
